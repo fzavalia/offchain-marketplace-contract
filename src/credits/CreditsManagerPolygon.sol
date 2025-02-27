@@ -479,7 +479,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         }
 
         // Store how much MANA was transferred out of the contract after the external call.
-        uint256 manaTransferred = mana.balanceOf(self) - balanceBefore;
+        uint256 manaTransferred = balanceBefore - mana.balanceOf(self);
 
         // Check that mana was transferred out of the contract.
         if (manaTransferred == 0) {
