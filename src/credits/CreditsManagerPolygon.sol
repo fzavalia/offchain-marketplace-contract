@@ -526,9 +526,10 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             // Calculate how much of the credit is left to be spent.
             uint256 creditRemainingValue = credit.value - spentValue[signatureHash];
 
-            // Check that the credit has not been completely spent.
+            // If the credit has been completely spent, skip it.
+            // This is to prevent bids from failing if they contain credits that were consumed on previous calls.
             if (creditRemainingValue == 0) {
-                revert SpentCredit(signatureHash);
+                continue;
             }
 
             // Calculate how much MANA is left to be credited from the total MANA transferred in the external call.
