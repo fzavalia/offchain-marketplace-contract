@@ -49,12 +49,14 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     /// Only used for custom external calls.
     /// Has to be signed by a wallet that has the customExternalCallSigner role.
     /// @param maxUncreditedValue The maximum amount of MANA the user is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
+    /// @param maxCreditedValue The maximum amount of MANA that can be credited from the provided credits.
     struct UseCreditsArgs {
         Credit[] credits;
         bytes[] creditsSignatures;
         ExternalCall externalCall;
         bytes customExternalCallSignature;
         uint256 maxUncreditedValue;
+        uint256 maxCreditedValue;
     }
 
     /// @param _value How much ERC20 the credit is worth.
@@ -113,6 +115,8 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     error UsedCustomExternalCallSignature(bytes32 _hashedCustomExternalCallSignature);
     error CustomExternalCallExpired(uint256 _expiresAt);
     error MaxUncreditedValueExceeded(uint256 _uncreditedValue, uint256 _maxUncreditedValue);
+    error MaxCreditedValueExceeded(uint256 _creditedValue, uint256 _maxCreditedValue);
+    error MaxCreditedValueZero();
 
     /// @param _roles The roles to initialize the contract with.
     /// @param _mana The MANA token.
@@ -245,6 +249,11 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             revert NoCredits();
         }
 
+        // Credits cannot be used if the amount to be consumed from them is 0.
+        if (_args.maxCreditedValue == 0) {
+            revert MaxCreditedValueZero();
+        }
+
         uint256 currentHour = block.timestamp / 1 hours;
 
         // Checks how much can be transferred out of the contract in the current hour.
@@ -371,6 +380,9 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
 
                     // Stores the maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
                     tempMaxUncreditedValue = _args.maxUncreditedValue;
+
+                    // Stores the maximum amount of MANA that can be credited from the provided credits.
+                    tempMaxCreditedValue = _args.maxCreditedValue;
 
                     // For bids, the consumer of the credits is the bidder, as it will be the signer of the bid the one paying with mana.
                     creditsConsumer = trade.signer;
@@ -540,6 +552,16 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             }
         }
 
+        if (creditedValue > _args.maxCreditedValue) {
+            revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
+        }
+
+        if (tempMaxCreditedValue != 0) {
+            // Resets the value back to default to optimize gas.
+            delete tempMaxCreditedValue;
+        }
+
+
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
 
@@ -563,11 +585,16 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
 
     /// @notice Function used by the Marketplace to verify that the credits being used have been validated by the bid signer.
     /// @param _caller The address of the user that has called the Marketplace (Has to be this contract).
-    /// @param _data The data of the external check (The hash of the signatures of the Credits to be used and the maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost).
+    /// @param _data The data of the external check.
+    /// Data which should be composed of:
+    /// - The hash of the signatures of the Credits to be used.
+    /// - The maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
+    /// - The maximum amount of MANA that can be credited from the provided credits.
     function bidExternalCheck(address _caller, bytes calldata _data) external view returns (bool) {
-        (bytes32 bidCreditsSignaturesHash, uint256 maxUncreditedValue) = abi.decode(_data, (bytes32, uint256));
+        (bytes32 bidCreditsSignaturesHash, uint256 maxUncreditedValue, uint256 maxCreditedValue) = abi.decode(_data, (bytes32, uint256, uint256));
 
-        return _caller == address(this) && bidCreditsSignaturesHash == tempBidCreditsSignaturesHash && maxUncreditedValue == tempMaxUncreditedValue;
+        return _caller == address(this) && bidCreditsSignaturesHash == tempBidCreditsSignaturesHash && maxUncreditedValue == tempMaxUncreditedValue
+            && maxCreditedValue == tempMaxCreditedValue;
     }
 
     /// @dev This is to update the maximum amount of MANA that can be transferred out of the contract per hour.

@@ -72,17 +72,20 @@ abstract contract CreditsManagerPolygonStorage {
     /// @notice The address of the CollectionFactoryV3 contract.
     ICollectionFactory public immutable collectionFactoryV3;
 
-    /// @notice The hash of the signatures of the Credits to be used for bids.
-    bytes32 internal tempBidCreditsSignaturesHash;
-
     /// @notice Tracks the allowed custom external calls.
     mapping(address => mapping(bytes4 => bool)) public allowedCustomExternalCalls;
 
     /// @notice Tracks the used external call signatures.
     mapping(bytes32 => bool) public usedCustomExternalCallSignature;
 
-    /// @notice The maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
-    uint256 public tempMaxUncreditedValue;
+    /// @dev Value stored temporarily to check the validity of credits used for bids.
+    bytes32 internal tempBidCreditsSignaturesHash;
+
+    /// @dev Value stored temporarily to check the validity of max uncredited value used for bids.
+    uint256 internal tempMaxUncreditedValue;
+
+    /// @dev Value stored temporarily to check the validity of max credited value used for bids.
+    uint256 internal tempMaxCreditedValue;
 
     /// @dev Initializes immutable variables.
     /// @param _mana The MANA token.
