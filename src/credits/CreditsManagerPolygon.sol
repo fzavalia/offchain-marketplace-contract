@@ -123,6 +123,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     error NotBid();
     error NotListing();
     error OnlyBidsWithSameSignerAllowed();
+    error CreditedValueZero();
     error SecondarySalesNotAllowed();
     error PrimarySalesNotAllowed();
 
@@ -638,6 +639,12 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             if (creditedValue == manaTransferred) {
                 break;
             }
+        }
+
+        // Checks that something was credited.
+        // It could happen that all provided credits were already spent.
+        if (creditedValue == 0) {
+            revert CreditedValueZero();
         }
 
         // Checks that the amount of MANA credited is not higher than the maximum amount allowed.
