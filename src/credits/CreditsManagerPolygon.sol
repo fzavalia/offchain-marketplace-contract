@@ -344,6 +344,12 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
     }
 
+    /// @notice Update whether bids are allowed.
+    /// @param _bidsAllowed Whether bids are allowed.
+    function updateBidsAllowed(bool _bidsAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateBidsAllowed(_bidsAllowed);
+    }
+
     /// @notice Withdraw ERC20 tokens from the contract.
     /// @param _token The address of the ERC20 token.
     /// @param _amount The amount of ERC20 tokens to withdraw.
@@ -872,6 +878,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         secondarySalesAllowed = _secondarySalesAllowed;
 
         emit SecondarySalesAllowedUpdated(_secondarySalesAllowed);
+    }
+
+    /// @dev Updates whether bids are allowed.
+    /// @param _bidsAllowed Whether bids are allowed.
+    function _updateBidsAllowed(bool _bidsAllowed) internal {
+        bidsAllowed = _bidsAllowed;
+
+        emit BidsAllowedUpdated(_bidsAllowed);
     }
 
     /// @dev This is used to prevent users from consuming credits on non-decentraland collections.
