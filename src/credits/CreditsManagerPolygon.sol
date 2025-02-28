@@ -95,6 +95,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
     event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
     event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
+    event BidsAllowedUpdated(bool _bidsAllowed);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);
@@ -126,12 +127,14 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     error CreditedValueZero();
     error SecondarySalesNotAllowed();
     error PrimarySalesNotAllowed();
+    error BidsNotAllowed();
 
     /// @param _roles The roles to initialize the contract with.
     /// @param _mana The MANA token.
     /// @param _maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
     /// @param _primarySalesAllowed Whether primary sales are allowed.
     /// @param _secondarySalesAllowed Whether secondary sales are allowed.
+    /// @param _bidsAllowed Whether bids are allowed.
     /// @param _marketplace The Marketplace contract.
     /// @param _legacyMarketplace The Legacy Marketplace contract.
     /// @param _collectionStore The CollectionStore contract.
@@ -143,6 +146,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         uint256 _maxManaTransferPerHour,
         bool _primarySalesAllowed,
         bool _secondarySalesAllowed,
+        bool _bidsAllowed,
         address _marketplace,
         address _legacyMarketplace,
         address _collectionStore,
@@ -174,6 +178,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
 
         _updatePrimarySalesAllowed(_primarySalesAllowed);
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
+        _updateBidsAllowed(_bidsAllowed);
     }
 
     /// @notice Pauses the contract.
@@ -229,6 +234,12 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     /// @param _secondarySalesAllowed Whether secondary sales are allowed.
     function updateSecondarySalesAllowed(bool _secondarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
+    }
+
+    /// @notice Update whether bids are allowed.
+    /// @param _bidsAllowed Whether bids are allowed.
+    function updateBidsAllowed(bool _bidsAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateBidsAllowed(_bidsAllowed);
     }
 
     /// @notice Withdraw ERC20 tokens from the contract.
@@ -328,6 +339,8 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             }
             // Offchain Marketplace.
             else if (_args.externalCall.target == marketplace) {
+                bool memBidsAllowed = bidsAllowed;
+
                 // Check that only accept or acceptWithCoupon are being called.
                 if (
                     _args.externalCall.selector != IMarketplace.accept.selector
@@ -397,6 +410,10 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
                     }
                     // If it is not a listing, we verify that it is a bid by checking if the sent assets contain only a mana asset.
                     else if (trade.sent.length == 1 && trade.sent[0].contractAddress == address(mana)) {
+                        if (!memBidsAllowed) {
+                            revert BidsNotAllowed();
+                        }
+
                         // For the second trade onwards, we check that is is not of the opposite type.
                         // In this case, if the first trade was a listing, it should revert because this one is a bid.
                         if (i > 0) {
@@ -714,6 +731,14 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         secondarySalesAllowed = _secondarySalesAllowed;
 
         emit SecondarySalesAllowedUpdated(_secondarySalesAllowed);
+    }
+
+    /// @dev Updates whether bids are allowed.
+    /// @param _bidsAllowed Whether bids are allowed.
+    function _updateBidsAllowed(bool _bidsAllowed) internal {
+        bidsAllowed = _bidsAllowed;
+
+        emit BidsAllowedUpdated(_bidsAllowed);
     }
 
     /// @dev This is used to prevent users from consuming credits on non-decentraland collections.

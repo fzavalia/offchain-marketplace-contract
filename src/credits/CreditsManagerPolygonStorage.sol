@@ -69,6 +69,9 @@ abstract contract CreditsManagerPolygonStorage {
     /// @notice Whether secondary sales are allowed.
     bool public secondarySalesAllowed;
 
+    /// @notice Whether bids are allowed.
+    bool public bidsAllowed;
+
     /// @notice The address of the Marketplace contract.
     address public immutable marketplace;
 
