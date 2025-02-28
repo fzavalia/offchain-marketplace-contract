@@ -34,6 +34,12 @@ abstract contract CreditsManagerPolygonStorage {
     /// @notice The role that can revoke external calls.
     bytes32 public constant EXTERNAL_CALL_REVOKER_ROLE = keccak256("EXTERNAL_CALL_REVOKER_ROLE");
 
+    /// @notice Asset type for NFTs for the Marketplace Trade struct.
+    uint256 public constant ASSET_TYPE_ERC721 = 3;
+
+    /// @notice Asset type for collection items for the Marketplace Trade struct.
+    uint256 public constant ASSET_TYPE_COLLECTION_ITEM = 4;
+
     /// @notice Whether a user is denied from using credits.
     mapping(address => bool) public isDenied;
 
@@ -56,6 +62,12 @@ abstract contract CreditsManagerPolygonStorage {
 
     /// @notice The hour of the last MANA transfer.
     uint256 public hourOfLastManaTransfer;
+
+    /// @notice Whether primary sales are allowed.
+    bool public primarySalesAllowed;
+
+    /// @notice Whether secondary sales are allowed.
+    bool public secondarySalesAllowed;
 
     /// @notice The address of the Marketplace contract.
     address public immutable marketplace;

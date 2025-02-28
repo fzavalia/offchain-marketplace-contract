@@ -93,6 +93,8 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
     event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
+    event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
+    event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);
@@ -121,10 +123,14 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     error NotBid();
     error NotListing();
     error OnlyBidsWithSameSignerAllowed();
+    error SecondarySalesNotAllowed();
+    error PrimarySalesNotAllowed();
 
     /// @param _roles The roles to initialize the contract with.
     /// @param _mana The MANA token.
     /// @param _maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
+    /// @param _primarySalesAllowed Whether primary sales are allowed.
+    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
     /// @param _marketplace The Marketplace contract.
     /// @param _legacyMarketplace The Legacy Marketplace contract.
     /// @param _collectionStore The CollectionStore contract.
@@ -134,6 +140,8 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         Roles memory _roles,
         IERC20 _mana,
         uint256 _maxManaTransferPerHour,
+        bool _primarySalesAllowed,
+        bool _secondarySalesAllowed,
         address _marketplace,
         address _legacyMarketplace,
         address _collectionStore,
@@ -162,6 +170,9 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.owner);
 
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+
+        _updatePrimarySalesAllowed(_primarySalesAllowed);
+        _updateSecondarySalesAllowed(_secondarySalesAllowed);
     }
 
     /// @notice Pauses the contract.
@@ -205,6 +216,18 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     /// @param _maxManaTransferPerHour The new maximum amount of MANA that can be transferred out of the contract per hour.
     function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+    }
+
+    /// @notice Update whether primary sales are allowed.
+    /// @param _primarySalesAllowed Whether primary sales are allowed.
+    function updatePrimarySalesAllowed(bool _primarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updatePrimarySalesAllowed(_primarySalesAllowed);
+    }
+
+    /// @notice Update whether secondary sales are allowed.
+    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
+    function updateSecondarySalesAllowed(bool _secondarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateSecondarySalesAllowed(_secondarySalesAllowed);
     }
 
     /// @notice Withdraw ERC20 tokens from the contract.
@@ -280,12 +303,20 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         address creditsConsumer = _msgSender();
 
         {
+            // Cache the values to prevent multiple storage reads.
+            bool memPrimarySalesAllowed = primarySalesAllowed;
+            bool memSecondarySalesAllowed = secondarySalesAllowed;
+
             // Legacy Marketplace.
             if (_args.externalCall.target == legacyMarketplace) {
                 // Check that only executeOrder is being called.
                 // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
                 if (_args.externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
                     revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
+                }
+
+                if (!memSecondarySalesAllowed) {
+                    revert SecondarySalesNotAllowed();
                 }
 
                 // Decode the contract address from the data
@@ -344,11 +375,21 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
                         }
 
                         for (uint256 j = 0; j < sentLength; j++) {
+                            IMarketplace.Asset memory asset = trade.sent[j];
+
                             // We check that the sent assets are decentraland collections items or nfts.
-                            _verifyDecentralandCollection(trade.sent[j].contractAddress);
+                            _verifyDecentralandCollection(asset.contractAddress);
+
+                            if (asset.assetType == ASSET_TYPE_ERC721 && !memSecondarySalesAllowed) {
+                                revert SecondarySalesNotAllowed();
+                            }
+
+                            if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM && !memPrimarySalesAllowed) {
+                                revert PrimarySalesNotAllowed();
+                            }
 
                             // We check that the beneficiary of the decentraland assets is not 0 so they are not received by this contract.
-                            if (trade.sent[j].beneficiary == address(0)) {
+                            if (asset.beneficiary == address(0)) {
                                 revert InvalidBeneficiary();
                             }
                         }
@@ -382,9 +423,19 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
                         }
 
                         for (uint256 j = 0; j < receivedLength; j++) {
+                            IMarketplace.Asset memory asset = trade.received[j];
+
                             // We check that the received assets are decentraland collections items or nfts.
                             // There is no need to check that the beneficiary is not 0 because the signer (bidder) address will be used in that case.
-                            _verifyDecentralandCollection(trade.received[j].contractAddress);
+                            _verifyDecentralandCollection(asset.contractAddress);
+
+                            if (asset.assetType == ASSET_TYPE_ERC721 && !memSecondarySalesAllowed) {
+                                revert SecondarySalesNotAllowed();
+                            }
+
+                            if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM && !memPrimarySalesAllowed) {
+                                revert PrimarySalesNotAllowed();
+                            }
                         }
 
                         // We check that the bid has an external check with this contract to verify that the credits provided are
@@ -427,6 +478,10 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
                 // Check that only buy is being called.
                 if (_args.externalCall.selector != ICollectionStore.buy.selector) {
                     revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
+                }
+
+                if (!memPrimarySalesAllowed) {
+                    revert PrimarySalesNotAllowed();
                 }
 
                 // Decode the items to buy from the data.
@@ -585,6 +640,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             }
         }
 
+        // Checks that the amount of MANA credited is not higher than the maximum amount allowed.
         if (creditedValue > _args.maxCreditedValue) {
             revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
         }
@@ -635,6 +691,22 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         maxManaTransferPerHour = _maxManaTransferPerHour;
 
         emit MaxManaTransferPerHourUpdated(_maxManaTransferPerHour);
+    }
+
+    /// @dev Updates whether primary sales are allowed.
+    /// @param _primarySalesAllowed Whether primary sales are allowed.
+    function _updatePrimarySalesAllowed(bool _primarySalesAllowed) internal {
+        primarySalesAllowed = _primarySalesAllowed;
+
+        emit PrimarySalesAllowedUpdated(_primarySalesAllowed);
+    }
+
+    /// @dev Updates whether secondary sales are allowed.
+    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
+    function _updateSecondarySalesAllowed(bool _secondarySalesAllowed) internal {
+        secondarySalesAllowed = _secondarySalesAllowed;
+
+        emit SecondarySalesAllowedUpdated(_secondarySalesAllowed);
     }
 
     /// @dev This is used to prevent users from consuming credits on non-decentraland collections.
