@@ -216,11 +216,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     error MaxManaCreditedPerHourExceeded(uint256 _creditableManaThisHour, uint256 _creditedValue);
 
     /// @param _roles The roles to initialize the contract with.
-    /// @param _mana The MANA token.
     /// @param _maxManaCreditedPerHour The maximum amount of MANA that can be credited per hour.
     /// @param _primarySalesAllowed Whether primary sales are allowed.
     /// @param _secondarySalesAllowed Whether secondary sales are allowed.
     /// @param _bidsAllowed Whether bids are allowed.
+    /// @param _mana The MANA token.
     /// @param _marketplace The Marketplace contract.
     /// @param _legacyMarketplace The Legacy Marketplace contract.
     /// @param _collectionStore The CollectionStore contract.
@@ -228,11 +228,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _collectionFactoryV3 The CollectionFactoryV3 contract.
     constructor(
         Roles memory _roles,
-        IERC20 _mana,
         uint256 _maxManaCreditedPerHour,
         bool _primarySalesAllowed,
         bool _secondarySalesAllowed,
         bool _bidsAllowed,
+        IERC20 _mana,
         address _marketplace,
         address _legacyMarketplace,
         address _collectionStore,
