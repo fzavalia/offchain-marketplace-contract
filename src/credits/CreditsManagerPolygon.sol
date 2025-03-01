@@ -88,7 +88,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     event CreditRevoked(bytes32 indexed _creditId);
     event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
-    event MaxManaTransferPerHourUpdated(uint256 _maxManaTransferPerHour);
+    event MaxManaCreditedPerHourUpdated(uint256 _maxManaCreditedPerHour);
     event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
     event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
@@ -128,10 +128,11 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     error SecondarySalesNotAllowed();
     error PrimarySalesNotAllowed();
     error BidsNotAllowed();
+    error MaxManaCreditedPerHourExceeded(uint256 _creditableManaThisHour, uint256 _creditedValue);
 
     /// @param _roles The roles to initialize the contract with.
     /// @param _mana The MANA token.
-    /// @param _maxManaTransferPerHour The maximum amount of MANA that can be transferred out of the contract per hour.
+    /// @param _maxManaCreditedPerHour The maximum amount of MANA that can be credited per hour.
     /// @param _primarySalesAllowed Whether primary sales are allowed.
     /// @param _secondarySalesAllowed Whether secondary sales are allowed.
     /// @param _bidsAllowed Whether bids are allowed.
@@ -143,7 +144,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     constructor(
         Roles memory _roles,
         IERC20 _mana,
-        uint256 _maxManaTransferPerHour,
+        uint256 _maxManaCreditedPerHour,
         bool _primarySalesAllowed,
         bool _secondarySalesAllowed,
         bool _bidsAllowed,
@@ -174,7 +175,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.customExternalCallRevoker);
         _grantRole(EXTERNAL_CALL_REVOKER_ROLE, _roles.owner);
 
-        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+        _updateMaxManaCreditedPerHour(_maxManaCreditedPerHour);
 
         _updatePrimarySalesAllowed(_primarySalesAllowed);
         _updateSecondarySalesAllowed(_secondarySalesAllowed);
@@ -218,10 +219,10 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         emit CreditRevoked(_credit);
     }
 
-    /// @notice Update the maximum amount of MANA that can be transferred out of the contract per hour.
-    /// @param _maxManaTransferPerHour The new maximum amount of MANA that can be transferred out of the contract per hour.
-    function updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updateMaxManaTransferPerHour(_maxManaTransferPerHour);
+    /// @notice Update the maximum amount of MANA that can be credited per hour.
+    /// @param _maxManaCreditedPerHour The new maximum amount of MANA that can be credited per hour.
+    function updateMaxManaCreditedPerHour(uint256 _maxManaCreditedPerHour) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _updateMaxManaCreditedPerHour(_maxManaCreditedPerHour);
     }
 
     /// @notice Update whether primary sales are allowed.
@@ -291,21 +292,6 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         // Credits cannot be used if the amount to be consumed from them is 0.
         if (_args.maxCreditedValue == 0) {
             revert MaxCreditedValueZero();
-        }
-
-        uint256 currentHour = block.timestamp / 1 hours;
-
-        // Checks how much can be transferred out of the contract in the current hour.
-        if (currentHour != hourOfLastManaTransfer) {
-            // Resets the values as it is a new hour.
-            manaTransferredThisHour = 0;
-            hourOfLastManaTransfer = currentHour;
-
-            // Approve for the maximum amount as it is a new hour.
-            mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue);
-        } else {
-            // Given that a transfer happened in this same hour, the approval has to be for the remaining transferable amount.
-            mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue - manaTransferredThisHour);
         }
 
         address self = address(this);
@@ -557,6 +543,13 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             revert DeniedUser(creditsConsumer);
         }
 
+        // Transfer the mana the consumer is willing to pay from their wallet to this contract.
+        // The consumer will be returned any exceeding amount that was not needed to cover the uncredited amount.
+        mana.safeTransferFrom(creditsConsumer, self, _args.maxUncreditedValue);
+
+        // Approves the combined amount of credited and uncredited mana the consumer is willing to pay.
+        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + _args.maxCreditedValue);
+
         // Store the mana balance before the external call.
         uint256 balanceBefore = mana.balanceOf(self);
 
@@ -593,9 +586,6 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
 
         // Reset the approval back to 0 in case the amount allowed this hour was more than required.
         mana.forceApprove(_args.externalCall.target, 0);
-
-        // Increment the amount of MANA transferred this hour.
-        manaTransferredThisHour += manaTransferred;
 
         // Keeps track of how much MANA is credited by the credits.
         uint256 creditedValue = 0;
@@ -674,6 +664,29 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             delete tempMaxCreditedValue;
         }
 
+        uint256 currentHour = block.timestamp / 1 hours;
+        uint256 creditableManaThisHour;
+
+        // Calculates how much mana could be credited this hour.
+        if (currentHour != hourOfLastManaCredit) {
+            // If the current hour is different than the one of the last execution, resets the values.
+            manaCreditedThisHour = 0;
+            hourOfLastManaCredit = currentHour;
+
+            // This new hour allows the maximum amount to be credited.
+            creditableManaThisHour = maxManaCreditedPerHour;
+        } else {
+            // If it is the same hour, the max creditable amount has to consider the amount already credited.
+            creditableManaThisHour = maxManaCreditedPerHour - manaCreditedThisHour;
+        }
+
+        // If the credited amount in this transaction is higher than the allowed this hour, it reverts.
+        if (creditedValue > creditableManaThisHour) {
+            revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, creditedValue);
+        }
+
+        // Increase the amount of mana credited this hour.
+        manaCreditedThisHour += creditedValue;
 
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
@@ -689,8 +702,11 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
                 // Resets the value back to default to optimize gas.
                 delete tempMaxUncreditedValue;
             }
+        }
 
-            mana.safeTransferFrom(creditsConsumer, self, uncredited);
+        // If the amount that was not covered by credits is less than the maximum allowed by the consumer, transfer the difference back to the consumer.
+        if (uncredited < _args.maxUncreditedValue) {
+            mana.safeTransfer(creditsConsumer, _args.maxUncreditedValue - uncredited);
         }
 
         emit CreditsUsed(manaTransferred, creditedValue);
@@ -710,11 +726,11 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
             && maxCreditedValue == tempMaxCreditedValue;
     }
 
-    /// @dev This is to update the maximum amount of MANA that can be transferred out of the contract per hour.
-    function _updateMaxManaTransferPerHour(uint256 _maxManaTransferPerHour) internal {
-        maxManaTransferPerHour = _maxManaTransferPerHour;
+    /// @dev This is to update the maximum amount of MANA that can be credited per hour.
+    function _updateMaxManaCreditedPerHour(uint256 _maxManaCreditedPerHour) internal {
+        maxManaCreditedPerHour = _maxManaCreditedPerHour;
 
-        emit MaxManaTransferPerHourUpdated(_maxManaTransferPerHour);
+        emit MaxManaCreditedPerHourUpdated(_maxManaCreditedPerHour);
     }
 
     /// @dev Updates whether primary sales are allowed.

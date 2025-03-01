@@ -54,14 +54,14 @@ abstract contract CreditsManagerPolygonStorage {
     /// @dev The key is the hash of the credit signature.
     mapping(bytes32 => uint256) spentValue;
 
-    /// @notice Maximum amount of MANA that can be transferred out of the contract per hour.
-    uint256 public maxManaTransferPerHour;
+    /// @notice Maximum amount of MANA that can be credited per hour.
+    uint256 public maxManaCreditedPerHour;
 
-    /// @notice How much MANA has been transferred out of the contract this hour.
-    uint256 public manaTransferredThisHour;
+    /// @notice How much MANA has been credited this hour.
+    uint256 public manaCreditedThisHour;
 
-    /// @notice The hour of the last MANA transfer.
-    uint256 public hourOfLastManaTransfer;
+    /// @notice The hour of the last MANA credit.
+    uint256 public hourOfLastManaCredit;
 
     /// @notice Whether primary sales are allowed.
     bool public primarySalesAllowed;
