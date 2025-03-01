@@ -332,24 +332,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _updateBidsAllowed(_bidsAllowed);
     }
 
-    /// @notice Update whether primary sales are allowed.
-    /// @param _primarySalesAllowed Whether primary sales are allowed.
-    function updatePrimarySalesAllowed(bool _primarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updatePrimarySalesAllowed(_primarySalesAllowed);
-    }
-
-    /// @notice Update whether secondary sales are allowed.
-    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
-    function updateSecondarySalesAllowed(bool _secondarySalesAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updateSecondarySalesAllowed(_secondarySalesAllowed);
-    }
-
-    /// @notice Update whether bids are allowed.
-    /// @param _bidsAllowed Whether bids are allowed.
-    function updateBidsAllowed(bool _bidsAllowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _updateBidsAllowed(_bidsAllowed);
-    }
-
     /// @notice Withdraw ERC20 tokens from the contract.
     /// @param _token The address of the ERC20 token.
     /// @param _amount The amount of ERC20 tokens to withdraw.
@@ -838,30 +820,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         maxManaCreditedPerHour = _maxManaCreditedPerHour;
 
         emit MaxManaCreditedPerHourUpdated(_maxManaCreditedPerHour);
-    }
-
-    /// @dev Updates whether primary sales are allowed.
-    /// @param _primarySalesAllowed Whether primary sales are allowed.
-    function _updatePrimarySalesAllowed(bool _primarySalesAllowed) internal {
-        primarySalesAllowed = _primarySalesAllowed;
-
-        emit PrimarySalesAllowedUpdated(_primarySalesAllowed);
-    }
-
-    /// @dev Updates whether secondary sales are allowed.
-    /// @param _secondarySalesAllowed Whether secondary sales are allowed.
-    function _updateSecondarySalesAllowed(bool _secondarySalesAllowed) internal {
-        secondarySalesAllowed = _secondarySalesAllowed;
-
-        emit SecondarySalesAllowedUpdated(_secondarySalesAllowed);
-    }
-
-    /// @dev Updates whether bids are allowed.
-    /// @param _bidsAllowed Whether bids are allowed.
-    function _updateBidsAllowed(bool _bidsAllowed) internal {
-        bidsAllowed = _bidsAllowed;
-
-        emit BidsAllowedUpdated(_bidsAllowed);
     }
 
     /// @dev Updates whether primary sales are allowed.
