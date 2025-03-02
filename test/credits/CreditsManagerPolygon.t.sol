@@ -316,4 +316,61 @@ contract CreditsManagerPolygonTest is Test {
         creditsManager.updateBidsAllowed(true);
         assertEq(creditsManager.bidsAllowed(), true);
     }
+
+    function test_bidExternalCheck_ReturnsFalseWhenNotSelf() public {
+        bytes memory data = abi.encode(bytes32(uint256(1)), uint256(2), uint256(3));
+        assertFalse(creditsManager.bidExternalCheck(address(this), data));
+    }
+
+    function test_bidExternalCheck_ReturnsFalseWhenCreditsSignaturesHashIsDifferent() public {
+        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
+        uint256 maxUncreditedValue = 2;
+        uint256 maxCreditedValue = 3;
+
+        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
+        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
+        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+
+        bytes memory data = abi.encode(bytes32(uint256(0)), maxUncreditedValue, maxCreditedValue);
+        assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
+    }
+
+    function test_bidExternalCheck_ReturnsFalseWhenMaxUncreditedValueIsDifferent() public {
+        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
+        uint256 maxUncreditedValue = 2;
+        uint256 maxCreditedValue = 3;
+
+        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
+        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
+        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+
+        bytes memory data = abi.encode(bidCreditsSignaturesHash, 0, maxCreditedValue);
+        assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
+    }
+
+    function test_bidExternalCheck_ReturnsFalseWhenMaxCreditedValueIsDifferent() public {
+        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
+        uint256 maxUncreditedValue = 2;
+        uint256 maxCreditedValue = 3;
+
+        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
+        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
+        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+
+        bytes memory data = abi.encode(bidCreditsSignaturesHash, maxUncreditedValue, 0);
+        assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
+    }
+
+    function test_bidExternalCheck_ReturnsTrueWhenAllValuesAreSame() public {
+        bytes32 bidCreditsSignaturesHash = bytes32(uint256(1));
+        uint256 maxUncreditedValue = 2;
+        uint256 maxCreditedValue = 3;
+
+        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
+        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
+        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+
+        bytes memory data = abi.encode(bidCreditsSignaturesHash, maxUncreditedValue, maxCreditedValue);
+        assertTrue(creditsManager.bidExternalCheck(address(creditsManager), data));
+    }
 }
