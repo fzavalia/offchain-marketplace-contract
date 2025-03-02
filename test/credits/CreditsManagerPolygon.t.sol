@@ -145,7 +145,9 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_unpause_RevertsWhenNotOwner() public {
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE()));
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
         creditsManager.unpause();
     }
 
@@ -155,7 +157,7 @@ contract CreditsManagerPolygonTest is Test {
         creditsManager.unpause();
         vm.stopPrank();
     }
-    
+
     function test_unpause_WhenOwner() public {
         vm.startPrank(owner);
         creditsManager.pause();
@@ -173,7 +175,7 @@ contract CreditsManagerPolygonTest is Test {
         creditsManager.denyUser(address(this));
 
         assertTrue(creditsManager.isDenied(address(this)));
-    }   
+    }
 
     function test_denyUser_WhenOwner() public {
         vm.prank(owner);
@@ -183,7 +185,9 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_allowUser_RevertsWhenNotOwner() public {
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE()));
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
         creditsManager.allowUser(address(this));
     }
 
@@ -199,5 +203,26 @@ contract CreditsManagerPolygonTest is Test {
         creditsManager.allowUser(address(this));
 
         assertFalse(creditsManager.isDenied(address(this)));
+    }
+
+    function test_revokeCredit_RevertsWhenNotRevoker() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.REVOKER_ROLE())
+        );
+        creditsManager.revokeCredit(bytes32(0));
+    }
+
+    function test_revokeCredit_WhenRevoker() public {
+        vm.prank(revoker);
+        creditsManager.revokeCredit(bytes32(0));
+
+        assertTrue(creditsManager.isRevoked(bytes32(0)));
+    }
+
+    function test_revokeCredit_WhenOwner() public {
+        vm.prank(owner);
+        creditsManager.revokeCredit(bytes32(0));
+
+        assertTrue(creditsManager.isRevoked(bytes32(0)));
     }
 }
