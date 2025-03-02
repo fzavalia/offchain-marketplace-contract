@@ -239,4 +239,55 @@ contract CreditsManagerPolygonTest is Test {
 
         assertEq(creditsManager.maxManaCreditedPerHour(), 1);
     }
+
+    function test_updatePrimarySalesAllowed_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.updatePrimarySalesAllowed(primarySalesAllowed);
+    }
+
+    function test_updatePrimarySalesAllowed_WhenOwner() public {
+        vm.prank(owner);
+        creditsManager.updatePrimarySalesAllowed(false);
+        assertEq(creditsManager.primarySalesAllowed(), false);
+
+        vm.prank(owner);
+        creditsManager.updatePrimarySalesAllowed(true);
+        assertEq(creditsManager.primarySalesAllowed(), true);
+    }
+
+    function test_updateSecondarySalesAllowed_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.updateSecondarySalesAllowed(secondarySalesAllowed);
+    }
+
+    function test_updateSecondarySalesAllowed_WhenOwner() public {
+        vm.prank(owner);
+        creditsManager.updateSecondarySalesAllowed(false);
+        assertEq(creditsManager.secondarySalesAllowed(), false);
+
+        vm.prank(owner);
+        creditsManager.updateSecondarySalesAllowed(true);
+        assertEq(creditsManager.secondarySalesAllowed(), true);
+    }
+
+    function test_updateBidsAllowed_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.updateBidsAllowed(bidsAllowed);
+    }
+
+    function test_updateBidsAllowed_WhenOwner() public {
+        vm.prank(owner);
+        creditsManager.updateBidsAllowed(false);
+        assertEq(creditsManager.bidsAllowed(), false);
+
+        vm.prank(owner);
+        creditsManager.updateBidsAllowed(true);
+        assertEq(creditsManager.bidsAllowed(), true);
+    }
 }
