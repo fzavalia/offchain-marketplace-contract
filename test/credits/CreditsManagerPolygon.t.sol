@@ -225,4 +225,18 @@ contract CreditsManagerPolygonTest is Test {
 
         assertTrue(creditsManager.isRevoked(bytes32(0)));
     }
+
+    function test_updateMaxManaCreditedPerHour_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.updateMaxManaCreditedPerHour(maxManaCreditedPerHour);
+    }
+
+    function test_updateMaxManaCreditedPerHour_WhenOwner() public {
+        vm.prank(owner);
+        creditsManager.updateMaxManaCreditedPerHour(1);
+
+        assertEq(creditsManager.maxManaCreditedPerHour(), 1);
+    }
 }
