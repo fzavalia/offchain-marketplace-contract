@@ -143,4 +143,23 @@ contract CreditsManagerPolygonTest is Test {
         vm.prank(owner);
         creditsManager.pause();
     }
+
+    function test_unpause_RevertsWhenNotOwner() public {
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE()));
+        creditsManager.unpause();
+    }
+
+    function test_unpause_RevertsWhenPauser() public {
+        vm.startPrank(pauser);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, pauser, creditsManager.DEFAULT_ADMIN_ROLE()));
+        creditsManager.unpause();
+        vm.stopPrank();
+    }
+    
+    function test_unpause_WhenOwner() public {
+        vm.startPrank(owner);
+        creditsManager.pause();
+        creditsManager.unpause();
+        vm.stopPrank();
+    }
 }
