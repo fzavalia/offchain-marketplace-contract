@@ -90,11 +90,11 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
     event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
     event BidsAllowedUpdated(bool _bidsAllowed);
+    event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
     event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
-    event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
 
     error CreditExpired(bytes32 _creditId);

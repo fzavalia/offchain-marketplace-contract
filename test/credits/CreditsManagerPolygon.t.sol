@@ -65,6 +65,7 @@ contract CreditsManagerPolygonTest is Test {
     event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
     event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
     event BidsAllowedUpdated(bool _bidsAllowed);
+    event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -373,4 +374,19 @@ contract CreditsManagerPolygonTest is Test {
         bytes memory data = abi.encode(bidCreditsSignaturesHash, maxUncreditedValue, maxCreditedValue);
         assertTrue(creditsManager.bidExternalCheck(address(creditsManager), data));
     }
+
+    function test_allowCustomExternalCall_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.allowCustomExternalCall(address(this), bytes4(0), true);
+    }
+
+    function test_allowCustomExternalCall_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit CustomExternalCallAllowed(address(this), bytes4(0), true);
+        vm.prank(owner);
+        creditsManager.allowCustomExternalCall(address(this), bytes4(0), true);
+    }
+
 }
