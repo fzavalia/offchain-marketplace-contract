@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 
@@ -126,5 +127,20 @@ contract CreditsManagerPolygonTest is Test {
         assertEq(creditsManager.collectionStore(), collectionStore);
         assertEq(address(creditsManager.collectionFactory()), collectionFactory);
         assertEq(address(creditsManager.collectionFactoryV3()), collectionFactoryV3);
+    }
+
+    function test_pause_RevertsWhenNotPauser() public {
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.PAUSER_ROLE()));
+        creditsManager.pause();
+    }
+
+    function test_pause_WhenPauser() public {
+        vm.prank(pauser);
+        creditsManager.pause();
+    }
+
+    function test_pause_WhenOwner() public {
+        vm.prank(owner);
+        creditsManager.pause();
     }
 }
