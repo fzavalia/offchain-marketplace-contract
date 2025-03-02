@@ -129,6 +129,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
     error PrimarySalesNotAllowed();
     error BidsNotAllowed();
     error MaxManaCreditedPerHourExceeded(uint256 _creditableManaThisHour, uint256 _creditedValue);
+    error InvalidCreditsSignaturesLength();
 
     /// @param _roles The roles to initialize the contract with.
     /// @param _mana The MANA token.
@@ -287,6 +288,10 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
         // Why use this contract if you don't provide any credits?
         if (_args.credits.length == 0) {
             revert NoCredits();
+        }
+
+        if (_args.credits.length != _args.creditsSignatures.length) {
+            revert InvalidCreditsSignaturesLength();
         }
 
         // Credits cannot be used if the amount to be consumed from them is 0.
@@ -513,7 +518,7 @@ contract CreditsManagerPolygon is CreditsManagerPolygonStorage, AccessControl, P
                 }
 
                 // Check that the external call has not expired.
-                if (_args.externalCall.expiresAt != 0 && block.timestamp > _args.externalCall.expiresAt) {
+                if (block.timestamp > _args.externalCall.expiresAt) {
                     revert CustomExternalCallExpired(_args.externalCall.expiresAt);
                 }
 
