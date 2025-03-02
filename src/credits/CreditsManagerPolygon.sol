@@ -171,16 +171,16 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     event UserDenied(address indexed _user);
     event UserAllowed(address indexed _user);
     event CreditRevoked(bytes32 indexed _creditId);
+    event MaxManaCreditedPerHourUpdated(uint256 _maxManaCreditedPerHour);
+    event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
+    event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
+    event BidsAllowedUpdated(bool _bidsAllowed);
     event CreditUsed(bytes32 indexed _creditId, Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
-    event MaxManaCreditedPerHourUpdated(uint256 _maxManaCreditedPerHour);
     event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _token, uint256 _tokenId, address indexed _to);
     event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
     event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
-    event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
-    event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
-    event BidsAllowedUpdated(bool _bidsAllowed);
 
     error CreditExpired(bytes32 _creditId);
     error DeniedUser(address _user);

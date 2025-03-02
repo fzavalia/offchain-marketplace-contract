@@ -58,6 +58,14 @@ contract CreditsManagerPolygonTest is Test {
 
     CreditsManagerPolygonHarness creditsManager;
 
+    event UserDenied(address indexed _user);
+    event UserAllowed(address indexed _user);
+    event CreditRevoked(bytes32 indexed _creditId);
+    event MaxManaCreditedPerHourUpdated(uint256 _maxManaCreditedPerHour);
+    event PrimarySalesAllowedUpdated(bool _primarySalesAllowed);
+    event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
+    event BidsAllowedUpdated(bool _bidsAllowed);
+
     function setUp() public {
         owner = makeAddr("owner");
         signer = makeAddr("signer");
@@ -171,16 +179,18 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_denyUser_WhenDenier() public {
+        vm.expectEmit(address(creditsManager));
+        emit UserDenied(address(this));
         vm.prank(denier);
         creditsManager.denyUser(address(this));
-
         assertTrue(creditsManager.isDenied(address(this)));
     }
 
     function test_denyUser_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit UserDenied(address(this));
         vm.prank(owner);
         creditsManager.denyUser(address(this));
-
         assertTrue(creditsManager.isDenied(address(this)));
     }
 
@@ -199,9 +209,10 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_allowUser_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit UserAllowed(address(this));
         vm.prank(owner);
         creditsManager.allowUser(address(this));
-
         assertFalse(creditsManager.isDenied(address(this)));
     }
 
@@ -213,16 +224,18 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_revokeCredit_WhenRevoker() public {
+        vm.expectEmit(address(creditsManager));
+        emit CreditRevoked(bytes32(0));
         vm.prank(revoker);
         creditsManager.revokeCredit(bytes32(0));
-
         assertTrue(creditsManager.isRevoked(bytes32(0)));
     }
 
     function test_revokeCredit_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit CreditRevoked(bytes32(0));
         vm.prank(owner);
         creditsManager.revokeCredit(bytes32(0));
-
         assertTrue(creditsManager.isRevoked(bytes32(0)));
     }
 
@@ -234,9 +247,10 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_updateMaxManaCreditedPerHour_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit MaxManaCreditedPerHourUpdated(1);
         vm.prank(owner);
         creditsManager.updateMaxManaCreditedPerHour(1);
-
         assertEq(creditsManager.maxManaCreditedPerHour(), 1);
     }
 
@@ -248,10 +262,14 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_updatePrimarySalesAllowed_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit PrimarySalesAllowedUpdated(false);
         vm.prank(owner);
         creditsManager.updatePrimarySalesAllowed(false);
         assertEq(creditsManager.primarySalesAllowed(), false);
 
+        vm.expectEmit(address(creditsManager));
+        emit PrimarySalesAllowedUpdated(true);
         vm.prank(owner);
         creditsManager.updatePrimarySalesAllowed(true);
         assertEq(creditsManager.primarySalesAllowed(), true);
@@ -265,10 +283,14 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_updateSecondarySalesAllowed_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit SecondarySalesAllowedUpdated(false);
         vm.prank(owner);
         creditsManager.updateSecondarySalesAllowed(false);
         assertEq(creditsManager.secondarySalesAllowed(), false);
 
+        vm.expectEmit(address(creditsManager));
+        emit SecondarySalesAllowedUpdated(true);
         vm.prank(owner);
         creditsManager.updateSecondarySalesAllowed(true);
         assertEq(creditsManager.secondarySalesAllowed(), true);
@@ -282,10 +304,14 @@ contract CreditsManagerPolygonTest is Test {
     }
 
     function test_updateBidsAllowed_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit BidsAllowedUpdated(false);
         vm.prank(owner);
         creditsManager.updateBidsAllowed(false);
         assertEq(creditsManager.bidsAllowed(), false);
 
+        vm.expectEmit(address(creditsManager));
+        emit BidsAllowedUpdated(true);
         vm.prank(owner);
         creditsManager.updateBidsAllowed(true);
         assertEq(creditsManager.bidsAllowed(), true);
