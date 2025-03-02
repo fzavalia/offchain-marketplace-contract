@@ -66,6 +66,7 @@ contract CreditsManagerPolygonTest is Test {
     event SecondarySalesAllowedUpdated(bool _secondarySalesAllowed);
     event BidsAllowedUpdated(bool _bidsAllowed);
     event CustomExternalCallAllowed(address indexed _target, bytes4 indexed _selector, bool _allowed);
+    event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -389,4 +390,28 @@ contract CreditsManagerPolygonTest is Test {
         creditsManager.allowCustomExternalCall(address(this), bytes4(0), true);
     }
 
+    function test_revokeCustomExternalCall_RevertsWhenNotCustomExternalCallRevoker() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.EXTERNAL_CALL_REVOKER_ROLE())
+        );
+        creditsManager.revokeCustomExternalCall(bytes32(0));
+    }
+
+    function test_revokeCustomExternalCall_WhenCustomExternalCallRevoker() public {
+        vm.expectEmit(address(creditsManager));
+        emit CustomExternalCallRevoked(bytes32(0));
+        vm.prank(customExternalCallRevoker);
+        creditsManager.revokeCustomExternalCall(bytes32(0));
+
+        assertTrue(creditsManager.usedCustomExternalCallSignature(bytes32(0)));
+    }
+
+    function test_revokeCustomExternalCall_WhenOwner() public {
+        vm.expectEmit(address(creditsManager));
+        emit CustomExternalCallRevoked(bytes32(0));
+        vm.prank(owner);
+        creditsManager.revokeCustomExternalCall(bytes32(0));
+
+        assertTrue(creditsManager.usedCustomExternalCallSignature(bytes32(0)));
+    }
 }
