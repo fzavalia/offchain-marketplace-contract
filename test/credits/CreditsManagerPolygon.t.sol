@@ -162,4 +162,23 @@ contract CreditsManagerPolygonTest is Test {
         creditsManager.unpause();
         vm.stopPrank();
     }
+
+    function test_denyUser_RevertsWhenNotDenier() public {
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DENIER_ROLE()));
+        creditsManager.denyUser(address(this));
+    }
+
+    function test_denyUser_WhenDenier() public {
+        vm.prank(denier);
+        creditsManager.denyUser(address(this));
+
+        assertTrue(creditsManager.isDenied(address(this)));
+    }   
+
+    function test_denyUser_WhenOwner() public {
+        vm.prank(owner);
+        creditsManager.denyUser(address(this));
+
+        assertTrue(creditsManager.isDenied(address(this)));
+    }
 }
