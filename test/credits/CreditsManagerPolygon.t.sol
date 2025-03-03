@@ -54,7 +54,7 @@ contract MockExternalCallTarget {
     }
 }
 
-contract CreditsManagerPolygonTest is Test {
+contract CreditsManagerPolygonTestBase is Test {
     address owner;
     address signer;
     uint256 signerPk;
@@ -135,7 +135,9 @@ contract CreditsManagerPolygonTest is Test {
             ICollectionFactory(collectionFactoryV3)
         );
     }
+}
 
+contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     function test_constructor() public {
         assertEq(creditsManager.hasRole(creditsManager.DEFAULT_ADMIN_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.SIGNER_ROLE(), signer), true);
@@ -439,7 +441,9 @@ contract CreditsManagerPolygonTest is Test {
 
         assertTrue(creditsManager.usedCustomExternalCallSignature(bytes32(0)));
     }
+}
 
+contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManagerPolygonTestBase {
     function test_useCredits_RevertsWhenNoCredits() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](0);
 
