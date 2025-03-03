@@ -88,6 +88,7 @@ contract CreditsManagerPolygonTestBase is Test {
     event CustomExternalCallRevoked(bytes32 indexed _hashedExternalCallSignature);
     event CreditUsed(bytes32 indexed _creditId, CreditsManagerPolygon.Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
+    event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
 
     function setUp() public {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon"));
@@ -440,6 +441,35 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         creditsManager.revokeCustomExternalCall(bytes32(0));
 
         assertTrue(creditsManager.usedCustomExternalCallSignature(bytes32(0)));
+    }
+
+    function test_withdrawERC20_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.withdrawERC20(address(mana), 1 ether, address(this));
+    }
+
+    function test_withdrawERC20_WhenOwner() public {
+        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(2 ether)));
+
+        uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
+
+        vm.expectEmit(address(creditsManager));
+        emit ERC20Withdrawn(address(mana), 1 ether, owner);
+        vm.prank(owner);
+        creditsManager.withdrawERC20(address(mana), 1 ether, owner);
+
+        assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 1 ether);
+        assertEq(IERC20(mana).balanceOf(owner), 1 ether);
+
+        vm.expectEmit(address(creditsManager));
+        emit ERC20Withdrawn(address(mana), 1 ether, address(this));
+        vm.prank(owner);
+        creditsManager.withdrawERC20(address(mana), 1 ether, address(this));
+
+        assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 2 ether);
+        assertEq(IERC20(mana).balanceOf(address(this)), 1 ether);
     }
 }
 
