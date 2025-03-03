@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
@@ -55,27 +56,33 @@ contract MockExternalCallTarget {
 }
 
 contract CreditsManagerPolygonTestBase is Test {
-    address owner;
-    address signer;
-    uint256 signerPk;
-    address pauser;
-    address denier;
-    address revoker;
-    address customExternalCallSigner;
-    uint256 customExternalCallSignerPk;
-    address customExternalCallRevoker;
-    address mana;
-    uint256 maxManaCreditedPerHour;
-    bool primarySalesAllowed;
-    bool secondarySalesAllowed;
-    bool bidsAllowed;
-    address marketplace;
-    address legacyMarketplace;
-    address collectionStore;
-    address collectionFactory;
-    address collectionFactoryV3;
+    address internal owner;
+    address internal signer;
+    uint256 internal signerPk;
+    address internal pauser;
+    address internal denier;
+    address internal revoker;
+    address internal customExternalCallSigner;
+    uint256 internal customExternalCallSignerPk;
+    address internal customExternalCallRevoker;
+    address internal mana;
+    uint256 internal maxManaCreditedPerHour;
+    bool internal primarySalesAllowed;
+    bool internal secondarySalesAllowed;
+    bool internal bidsAllowed;
+    address internal marketplace;
+    address internal legacyMarketplace;
+    address internal collectionStore;
+    address internal collectionFactory;
+    address internal collectionFactoryV3;
 
-    CreditsManagerPolygonHarness creditsManager;
+    CreditsManagerPolygonHarness internal creditsManager;
+
+    address internal collection;
+    uint256 internal collectionTokenId;
+    address internal collectionOwner;
+    
+    address internal other;
 
     event UserDenied(address indexed _user);
     event UserAllowed(address indexed _user);
@@ -89,6 +96,7 @@ contract CreditsManagerPolygonTestBase is Test {
     event CreditUsed(bytes32 indexed _creditId, CreditsManagerPolygon.Credit _credit, uint256 _value);
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
     event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
+    event ERC721Withdrawn(address indexed _collection, uint256 _tokenId, address indexed _to);
 
     function setUp() public {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon"));
@@ -135,6 +143,12 @@ contract CreditsManagerPolygonTestBase is Test {
             ICollectionFactory(collectionFactory),
             ICollectionFactory(collectionFactoryV3)
         );
+
+        collection = 0xdD30F60f92F0BE0920e4D6dC4f696E3F6eC3e9ae;
+        collectionTokenId = 1;
+        collectionOwner = IERC721(collection).ownerOf(collectionTokenId);
+
+        other = makeAddr("other");
     }
 }
 
@@ -470,6 +484,27 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
         assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 2 ether);
         assertEq(IERC20(mana).balanceOf(address(this)), 1 ether);
+    }
+
+    function test_withdrawERC721_RevertsWhenNotOwner() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DEFAULT_ADMIN_ROLE())
+        );
+        creditsManager.withdrawERC721(collection, collectionTokenId, address(this));
+    }
+
+    function test_withdrawERC721_WhenOwner() public {
+        vm.prank(collectionOwner);
+        IERC721(collection).transferFrom(collectionOwner, address(creditsManager), collectionTokenId);
+
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), address(creditsManager));
+
+        vm.expectEmit(address(creditsManager));
+        emit ERC721Withdrawn(collection, collectionTokenId, other);
+        vm.prank(owner);
+        creditsManager.withdrawERC721(collection, collectionTokenId, other);
+
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), other);
     }
 }
 
