@@ -505,10 +505,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             && maxCreditedValue == tempMaxCreditedValue;
     }
 
-    // -----------------------------------------------------------------------------------------------------------------
-    // ------------------------------ Pre Execution Functions ----------------------------------------------------------
-    // -----------------------------------------------------------------------------------------------------------------
-
     function _handleLegacyMarketplacePreExecution(UseCreditsArgs calldata _args) internal view {
         // Check that only executeOrder is being called.
         // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
@@ -745,10 +741,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
-    // -----------------------------------------------------------------------------------------------------------------
-    // ------------------------------ Post Execution Functions ---------------------------------------------------------
-    // -----------------------------------------------------------------------------------------------------------------
-
     function _handleLegacyMarketplacePostExecution(UseCreditsArgs calldata _args) internal {
         (address contractAddress, uint256 tokenId) = abi.decode(_args.externalCall.data, (address, uint256));
 
@@ -756,10 +748,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         // We need to transfer the asset back to the user that is using the credits.
         IERC721(contractAddress).safeTransferFrom(address(this), _msgSender(), tokenId);
     }
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // ------------------------------ Internal Functions ---------------------------------------------------------------
-    // -----------------------------------------------------------------------------------------------------------------
 
     function _handleCredit(
         Credit calldata _credit,
