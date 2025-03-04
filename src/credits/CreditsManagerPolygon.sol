@@ -473,29 +473,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
         }
 
-        uint256 currentHour = block.timestamp / 1 hours;
-        uint256 creditableManaThisHour;
-
-        // Calculates how much mana could be credited this hour.
-        if (currentHour != hourOfLastManaCredit) {
-            // If the current hour is different than the one of the last execution, resets the values.
-            manaCreditedThisHour = 0;
-            hourOfLastManaCredit = currentHour;
-
-            // This new hour allows the maximum amount to be credited.
-            creditableManaThisHour = maxManaCreditedPerHour;
-        } else {
-            // If it is the same hour, the max creditable amount has to consider the amount already credited.
-            creditableManaThisHour = maxManaCreditedPerHour - manaCreditedThisHour;
-        }
-
-        // If the credited amount in this transaction is higher than the allowed this hour, it reverts.
-        if (creditedValue > creditableManaThisHour) {
-            revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, creditedValue);
-        }
-
-        // Increase the amount of mana credited this hour.
-        manaCreditedThisHour += creditedValue;
+        _handleMaxCreditedValuePerHour(creditedValue);
 
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
@@ -835,6 +813,32 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit CreditUsed(signatureHash, _credit, creditValueToSpend);
 
         return _creditedValue + creditValueToSpend;
+    }
+
+    function _handleMaxCreditedValuePerHour(uint256 _creditedValue) internal {
+        uint256 currentHour = block.timestamp / 1 hours;
+        uint256 creditableManaThisHour;
+
+        // Calculates how much mana could be credited this hour.
+        if (currentHour != hourOfLastManaCredit) {
+            // If the current hour is different than the one of the last execution, resets the values.
+            manaCreditedThisHour = 0;
+            hourOfLastManaCredit = currentHour;
+
+            // This new hour allows the maximum amount to be credited.
+            creditableManaThisHour = maxManaCreditedPerHour;
+        } else {
+            // If it is the same hour, the max creditable amount has to consider the amount already credited.
+            creditableManaThisHour = maxManaCreditedPerHour - manaCreditedThisHour;
+        }
+
+        // If the credited amount in this transaction is higher than the allowed this hour, it reverts.
+        if (_creditedValue > creditableManaThisHour) {
+            revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, _creditedValue);
+        }
+
+        // Increase the amount of mana credited this hour.
+        manaCreditedThisHour += _creditedValue;
     }
 
     /// @dev This is to update the maximum amount of MANA that can be credited per hour.
