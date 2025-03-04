@@ -12,11 +12,11 @@ import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol"
 contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
     constructor(
         Roles memory _roles,
-        IERC20 _mana,
         uint256 _maxManaCreditedPerHour,
         bool _primarySalesAllowed,
         bool _secondarySalesAllowed,
         bool _bidsAllowed,
+        IERC20 _mana,
         address _marketplace,
         address _legacyMarketplace,
         address _collectionStore,
@@ -25,11 +25,11 @@ contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
     )
         CreditsManagerPolygon(
             _roles,
-            _mana,
             _maxManaCreditedPerHour,
             _primarySalesAllowed,
             _secondarySalesAllowed,
             _bidsAllowed,
+            _mana,
             _marketplace,
             _legacyMarketplace,
             _collectionStore,
@@ -37,6 +37,18 @@ contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
             _collectionFactoryV3
         )
     {}
+
+    function updateTempBidCreditsSignaturesHash(bytes32 _tempBidCreditsSignaturesHash) external {
+        tempBidCreditsSignaturesHash = _tempBidCreditsSignaturesHash;
+    }
+
+    function updateTempMaxUncreditedValue(uint256 _tempMaxUncreditedValue) external {
+        tempMaxUncreditedValue = _tempMaxUncreditedValue;
+    }
+
+    function updateTempMaxCreditedValue(uint256 _tempMaxCreditedValue) external {
+        tempMaxCreditedValue = _tempMaxCreditedValue;
+    }
 }
 
 contract MockExternalCallTarget {
@@ -78,10 +90,12 @@ contract CreditsManagerPolygonTestBase is Test {
 
     CreditsManagerPolygonHarness internal creditsManager;
 
+    address internal manaHolder;
+
     address internal collection;
     uint256 internal collectionTokenId;
     address internal collectionOwner;
-    
+
     address internal other;
 
     event UserDenied(address indexed _user);
@@ -132,17 +146,19 @@ contract CreditsManagerPolygonTestBase is Test {
 
         creditsManager = new CreditsManagerPolygonHarness(
             roles,
-            IERC20(mana),
             maxManaCreditedPerHour,
             primarySalesAllowed,
             secondarySalesAllowed,
             bidsAllowed,
+            IERC20(mana),
             marketplace,
             legacyMarketplace,
             collectionStore,
             ICollectionFactory(collectionFactory),
             ICollectionFactory(collectionFactoryV3)
         );
+
+        manaHolder = 0xB08E3e7cc815213304d884C88cA476ebC50EaAB2;
 
         collection = 0xdD30F60f92F0BE0920e4D6dC4f696E3F6eC3e9ae;
         collectionTokenId = 1;
@@ -153,7 +169,7 @@ contract CreditsManagerPolygonTestBase is Test {
 }
 
 contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
-    function test_constructor() public {
+    function test_constructor() public view {
         assertEq(creditsManager.hasRole(creditsManager.DEFAULT_ADMIN_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.SIGNER_ROLE(), signer), true);
         assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), pauser), true);
@@ -359,7 +375,7 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(creditsManager.bidsAllowed(), true);
     }
 
-    function test_bidExternalCheck_ReturnsFalseWhenNotSelf() public {
+    function test_bidExternalCheck_ReturnsFalseWhenNotSelf() public view {
         bytes memory data = abi.encode(bytes32(uint256(1)), uint256(2), uint256(3));
         assertFalse(creditsManager.bidExternalCheck(address(this), data));
     }
@@ -369,9 +385,9 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         uint256 maxUncreditedValue = 2;
         uint256 maxCreditedValue = 3;
 
-        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
-        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
-        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
+        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
+        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
 
         bytes memory data = abi.encode(bytes32(uint256(0)), maxUncreditedValue, maxCreditedValue);
         assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
@@ -382,9 +398,9 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         uint256 maxUncreditedValue = 2;
         uint256 maxCreditedValue = 3;
 
-        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
-        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
-        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
+        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
+        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
 
         bytes memory data = abi.encode(bidCreditsSignaturesHash, 0, maxCreditedValue);
         assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
@@ -395,9 +411,9 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         uint256 maxUncreditedValue = 2;
         uint256 maxCreditedValue = 3;
 
-        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
-        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
-        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
+        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
+        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
 
         bytes memory data = abi.encode(bidCreditsSignaturesHash, maxUncreditedValue, 0);
         assertFalse(creditsManager.bidExternalCheck(address(creditsManager), data));
@@ -408,9 +424,9 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         uint256 maxUncreditedValue = 2;
         uint256 maxCreditedValue = 3;
 
-        vm.store(address(creditsManager), bytes32(uint256(9)), bidCreditsSignaturesHash);
-        vm.store(address(creditsManager), bytes32(uint256(10)), bytes32(maxUncreditedValue));
-        vm.store(address(creditsManager), bytes32(uint256(11)), bytes32(maxCreditedValue));
+        creditsManager.updateTempBidCreditsSignaturesHash(bidCreditsSignaturesHash);
+        creditsManager.updateTempMaxUncreditedValue(maxUncreditedValue);
+        creditsManager.updateTempMaxCreditedValue(maxCreditedValue);
 
         bytes memory data = abi.encode(bidCreditsSignaturesHash, maxUncreditedValue, maxCreditedValue);
         assertTrue(creditsManager.bidExternalCheck(address(creditsManager), data));
@@ -465,7 +481,8 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     }
 
     function test_withdrawERC20_WhenOwner() public {
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(2 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
 
