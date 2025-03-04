@@ -106,7 +106,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     uint256 internal tempMaxCreditedValue;
 
     /// @notice The roles to initialize the contract with.
-    /// @dev Mainly used to decrease the number of arguments in the constructor.
     /// @param owner The address that acts as default admin.
     /// @param signer The address that can sign credits.
     /// @param pauser The address that can pause the contract.
@@ -125,7 +124,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     }
 
     /// @notice The arguments for the useCredits function.
-    /// @dev This is used to avoid stack too deep errors.
     /// @param credits The credits to use.
     /// @param creditsSignatures The signatures of the credits.
     /// Has to be signed by a wallet that has the signer role.
@@ -144,9 +142,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         uint256 maxCreditedValue;
     }
 
-    /// @param _value How much ERC20 the credit is worth.
-    /// @param _expiresAt The timestamp when the credit expires.
-    /// @param _salt Value used to generate unique credits.
+    /// @param value How much ERC20 the credit is worth.
+    /// @param expiresAt The timestamp when the credit expires.
+    /// @param salt Value used to generate unique credits.
     struct Credit {
         uint256 value;
         uint256 expiresAt;
@@ -186,13 +184,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     error DeniedUser(address _user);
     error RevokedCredit(bytes32 _creditId);
     error InvalidSignature(bytes32 _creditId, address _recoveredSigner);
-    error SpentCredit(bytes32 _creditId);
     error NoMANATransfer();
     error NoCredits();
     error InvalidCreditValue();
     error InvalidExternalCallSelector(address _target, bytes4 _selector);
     error NotDecentralandCollection(address _contractAddress);
-    error OnlyOneTradeAllowed();
     error InvalidBeneficiary();
     error InvalidTrade(IMarketplace.Trade _trade);
     error ExternalCallFailed(ExternalCall _externalCall);
@@ -374,24 +370,53 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @param _args The arguments for the useCredits function.
     function useCredits(UseCreditsArgs calldata _args) external nonReentrant whenNotPaused {
-        // Check that the number of credits is not 0.
-        if (_args.credits.length == 0) {
-            revert NoCredits();
-        }
+        // Handle pre-execution checks for the different types of external calls.
+        // Gets the address that will finally consume the credits.
+        // For most external calls, this is the caller of the function but for marketplace bids, it is the signer of the bid.
+        address creditsConsumer = _handlePreExecution(_args);
 
-        // Check that the number of credits and the number of signatures are the same.
-        if (_args.credits.length != _args.creditsSignatures.length) {
-            revert InvalidCreditsSignaturesLength();
-        }
+        // Execute the external call and get the amount of MANA that was transferred out of the contract.
+        uint256 manaTransferred = _executeExternalCall(_args, creditsConsumer);
 
-        // Check that the maximum amount of MANA that can be credited is not 0.
-        if (_args.maxCreditedValue == 0) {
-            revert MaxCreditedValueZero();
-        }
+        // Handle post-execution checks.
+        _handlePostExecution(_args, creditsConsumer);
 
+        // Validate and get how much MANA will be credited by the credits.
+        uint256 creditedValue = _validateAndApplyCredits(_args, creditsConsumer, manaTransferred);
+
+        // Perform different checks on the credited value obtained.
+        _validateCreditedValue(_args, creditedValue);
+
+        // Calculate how much mana was not covered by credits.
+        uint256 uncredited = manaTransferred - creditedValue;
+
+        // Perform different checks on the uncredited value.
+        // Transfer any exceeding amount extracted from the consumer's wallet back to them.
+        _handleUncreditedValue(_args, uncredited, creditsConsumer);
+    }
+
+    /// @notice Function used by the Marketplace to verify that the credits being used have been validated by the bid signer.
+    /// @param _caller The address of the user that has called the Marketplace (Has to be this contract).
+    /// @param _data The data of the external check.
+    /// Data which should be composed of:
+    /// - The hash of the signatures of the Credits to be used.
+    /// - The maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
+    /// - The maximum amount of MANA that can be credited from the provided credits.
+    function bidExternalCheck(address _caller, bytes calldata _data) external view returns (bool) {
+        (bytes32 bidCreditsSignaturesHash, uint256 maxUncreditedValue, uint256 maxCreditedValue) = abi.decode(_data, (bytes32, uint256, uint256));
+
+        return _caller == address(this) && bidCreditsSignaturesHash == tempBidCreditsSignaturesHash && maxUncreditedValue == tempMaxUncreditedValue
+            && maxCreditedValue == tempMaxCreditedValue;
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // ------------------------------ PRE EXECUTION FUNCTIONS ----------------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------
+
+    function _handlePreExecution(UseCreditsArgs calldata _args) internal returns (address creditsConsumer) {
         // By default the consumer of the credits is the caller of the function.
         // The is a special case for marketplace bids in which the consumer is the signer of the bid instead.
-        address creditsConsumer = _msgSender();
+        creditsConsumer = _msgSender();
 
         if (_args.externalCall.target == legacyMarketplace) {
             _handleLegacyMarketplacePreExecution(_args);
@@ -407,80 +432,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         if (isDenied[creditsConsumer]) {
             revert DeniedUser(creditsConsumer);
         }
-
-        // Transfer the mana the consumer is willing to pay from their wallet to this contract.
-        // The consumer will be returned any exceeding amount that was not needed to cover the uncredited amount.
-        mana.safeTransferFrom(creditsConsumer, address(this), _args.maxUncreditedValue);
-
-        // Approves the combined amount of credited and uncredited mana the consumer is willing to pay.
-        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + _args.maxCreditedValue);
-
-        // Store the mana balance before the external call.
-        uint256 balanceBefore = mana.balanceOf(address(this));
-
-        // Execute the external call.
-        (bool success,) = _args.externalCall.target.call(abi.encodeWithSelector(_args.externalCall.selector, _args.externalCall.data));
-
-        if (!success) {
-            revert ExternalCallFailed(_args.externalCall);
-        }
-
-        // If the credits consumer is not the caller, it means that the execution was for a marketplace bid.
-        // In that case, we can delete the temporary values that were set on the pre execution to save gas.
-        if (creditsConsumer != _msgSender()) {
-            delete tempBidCreditsSignaturesHash;
-            delete tempMaxCreditedValue;
-            delete tempMaxUncreditedValue;
-        }
-
-        if (_args.externalCall.target == legacyMarketplace) {
-            _handleLegacyMarketplacePostExecution(_args);
-        }
-
-        // Store how much MANA was transferred out of the contract after the external call.
-        uint256 manaTransferred = balanceBefore - mana.balanceOf(address(this));
-
-        // Check that mana was transferred out of the contract.
-        if (manaTransferred == 0) {
-            revert NoMANATransfer();
-        }
-
-        // Reset the approval back to 0 in case the amount allowed this hour was more than required.
-        mana.forceApprove(_args.externalCall.target, 0);
-
-        // Keeps track of how much MANA is credited by the credits.
-        uint256 creditedValue = _validateAndApplyCredits(_args, creditsConsumer, manaTransferred);
-
-        _validateCreditedValue(creditedValue, _args.maxCreditedValue);
-
-        // Calculate how much mana was not covered by credits.
-        uint256 uncredited = manaTransferred - creditedValue;
-
-        // If the amount that was not covered by credits is higher than the maximum allowed by the consumer, it reverts.
-        if (uncredited > _args.maxUncreditedValue) {
-            revert MaxUncreditedValueExceeded(uncredited, _args.maxUncreditedValue);
-        }
-
-        // If the uncredited amount is less than the maximum allowed by the consumer, transfer the difference back to the consumer.
-        if (uncredited < _args.maxUncreditedValue) {
-            mana.safeTransfer(creditsConsumer, _args.maxUncreditedValue - uncredited);
-        }
-
-        emit CreditsUsed(manaTransferred, creditedValue);
-    }
-
-    /// @notice Function used by the Marketplace to verify that the credits being used have been validated by the bid signer.
-    /// @param _caller The address of the user that has called the Marketplace (Has to be this contract).
-    /// @param _data The data of the external check.
-    /// Data which should be composed of:
-    /// - The hash of the signatures of the Credits to be used.
-    /// - The maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
-    /// - The maximum amount of MANA that can be credited from the provided credits.
-    function bidExternalCheck(address _caller, bytes calldata _data) external view returns (bool) {
-        (bytes32 bidCreditsSignaturesHash, uint256 maxUncreditedValue, uint256 maxCreditedValue) = abi.decode(_data, (bytes32, uint256, uint256));
-
-        return _caller == address(this) && bidCreditsSignaturesHash == tempBidCreditsSignaturesHash && maxUncreditedValue == tempMaxUncreditedValue
-            && maxCreditedValue == tempMaxCreditedValue;
     }
 
     function _handleLegacyMarketplacePreExecution(UseCreditsArgs calldata _args) internal view {
@@ -719,6 +670,58 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // ------------------------------ EXECUTION FUNCTIONS --------------------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------
+
+    function _executeExternalCall(UseCreditsArgs calldata _args, address _creditsConsumer) internal returns (uint256 manaTransferred) {
+        // Transfer the mana the consumer is willing to pay from their wallet to this contract.
+        // The consumer will be returned any exceeding amount that was not needed to cover the uncredited amount.
+        mana.safeTransferFrom(_creditsConsumer, address(this), _args.maxUncreditedValue);
+
+        // Approves the combined amount of credited and uncredited mana the consumer is willing to pay.
+        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + _args.maxCreditedValue);
+
+        // Store the mana balance before the external call.
+        uint256 balanceBefore = mana.balanceOf(address(this));
+
+        // Execute the external call.
+        (bool success,) = _args.externalCall.target.call(abi.encodeWithSelector(_args.externalCall.selector, _args.externalCall.data));
+
+        if (!success) {
+            revert ExternalCallFailed(_args.externalCall);
+        }
+
+        // Store how much MANA was transferred out of the contract after the external call.
+        manaTransferred = balanceBefore - mana.balanceOf(address(this));
+
+        // Check that mana was transferred out of the contract.
+        if (manaTransferred == 0) {
+            revert NoMANATransfer();
+        }
+
+        // Reset the approval back to 0 in case the amount allowed this hour was more than required.
+        mana.forceApprove(_args.externalCall.target, 0);
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // ------------------------------ POST EXECUTION FUNCTIONS ---------------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------
+
+    function _handlePostExecution(UseCreditsArgs calldata _args, address _creditsConsumer) internal {
+        // If the credits consumer is not the caller, it means that the execution was for a marketplace bid.
+        // In that case, we can delete the temporary values that were set on the pre execution to save gas.
+        if (_creditsConsumer != _msgSender()) {
+            delete tempBidCreditsSignaturesHash;
+            delete tempMaxCreditedValue;
+            delete tempMaxUncreditedValue;
+        }
+
+        if (_args.externalCall.target == legacyMarketplace) {
+            _handleLegacyMarketplacePostExecution(_args);
+        }
+    }
+
     function _handleLegacyMarketplacePostExecution(UseCreditsArgs calldata _args) internal {
         (address contractAddress, uint256 tokenId) = abi.decode(_args.externalCall.data, (address, uint256));
 
@@ -727,10 +730,29 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         IERC721(contractAddress).safeTransferFrom(address(this), _msgSender(), tokenId);
     }
 
+    // -----------------------------------------------------------------------------------------------------------------
+    // ------------------------------ CREDIT FUNCTIONS -----------------------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------
+
     function _validateAndApplyCredits(UseCreditsArgs calldata _args, address _creditsConsumer, uint256 _manaTransferred)
         internal
         returns (uint256 creditedValue)
     {
+        // Check that the number of credits is not 0.
+        if (_args.credits.length == 0) {
+            revert NoCredits();
+        }
+
+        // Check that the number of credits and the number of signatures are the same.
+        if (_args.credits.length != _args.creditsSignatures.length) {
+            revert InvalidCreditsSignaturesLength();
+        }
+
+        // Check that the maximum amount of MANA that can be credited is not 0.
+        if (_args.maxCreditedValue == 0) {
+            revert MaxCreditedValueZero();
+        }
+
         for (uint256 i = 0; i < _args.credits.length; i++) {
             Credit calldata credit = _args.credits[i];
             bytes calldata signature = _args.creditsSignatures[i];
@@ -786,9 +808,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
                 break;
             }
         }
+
+        emit CreditsUsed(_manaTransferred, creditedValue);
     }
 
-    function _validateCreditedValue(uint256 _creditedValue, uint256 _maxCreditedValue) internal {
+    function _validateCreditedValue(UseCreditsArgs calldata _args, uint256 _creditedValue) internal {
         // Checks that something was credited.
         // It could happen that all provided credits were already spent.
         if (_creditedValue == 0) {
@@ -796,8 +820,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
 
         // Checks that the amount of MANA credited is not higher than the maximum amount allowed.
-        if (_creditedValue > _maxCreditedValue) {
-            revert MaxCreditedValueExceeded(_creditedValue, _maxCreditedValue);
+        if (_creditedValue > _args.maxCreditedValue) {
+            revert MaxCreditedValueExceeded(_creditedValue, _args.maxCreditedValue);
         }
 
         uint256 currentHour = block.timestamp / 1 hours;
@@ -824,6 +848,22 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         // Increase the amount of mana credited this hour.
         manaCreditedThisHour += _creditedValue;
     }
+
+    function _handleUncreditedValue(UseCreditsArgs calldata _args, uint256 _uncreditedValue, address _creditsConsumer) internal {
+        // If the amount that was not covered by credits is higher than the maximum allowed by the consumer, it reverts.
+        if (_uncreditedValue > _args.maxUncreditedValue) {
+            revert MaxUncreditedValueExceeded(_uncreditedValue, _args.maxUncreditedValue);
+        }
+
+        // If the uncredited amount is less than the maximum allowed by the consumer, transfer the difference back to the consumer.
+        if (_uncreditedValue < _args.maxUncreditedValue) {
+            mana.safeTransfer(_creditsConsumer, _args.maxUncreditedValue - _uncreditedValue);
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // ------------------------------ OTHER INTERNAL FUNCTIONS ---------------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------
 
     /// @dev This is to update the maximum amount of MANA that can be credited per hour.
     function _updateMaxManaCreditedPerHour(uint256 _maxManaCreditedPerHour) internal {
