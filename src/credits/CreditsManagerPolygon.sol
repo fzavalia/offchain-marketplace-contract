@@ -556,15 +556,12 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
 
-        // If the credits could not amount to the total MANA transferred, the user has to pay back the difference to the contract.
-        if (uncredited > 0) {
-            // The transaction reverts if the amount defined by the user is lower than the amount that couldn't be credited.
-            if (uncredited > _args.maxUncreditedValue) {
-                revert MaxUncreditedValueExceeded(uncredited, _args.maxUncreditedValue);
-            }
+        // If the amount that was not covered by credits is higher than the maximum allowed by the consumer, it reverts.
+        if (uncredited > _args.maxUncreditedValue) {
+            revert MaxUncreditedValueExceeded(uncredited, _args.maxUncreditedValue);
         }
 
-        // If the amount that was not covered by credits is less than the maximum allowed by the consumer, transfer the difference back to the consumer.
+        // If the uncredited amount is less than the maximum allowed by the consumer, transfer the difference back to the consumer.
         if (uncredited < _args.maxUncreditedValue) {
             mana.safeTransfer(creditsConsumer, _args.maxUncreditedValue - uncredited);
         }
