@@ -389,8 +389,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert MaxCreditedValueZero();
         }
 
-        address self = address(this);
-
         // By default the consumer of the credits is the caller of the function.
         // The is a special case for marketplace bids in which the consumer is the signer of the bid instead.
         address creditsConsumer = _msgSender();
@@ -412,13 +410,13 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
         // Transfer the mana the consumer is willing to pay from their wallet to this contract.
         // The consumer will be returned any exceeding amount that was not needed to cover the uncredited amount.
-        mana.safeTransferFrom(creditsConsumer, self, _args.maxUncreditedValue);
+        mana.safeTransferFrom(creditsConsumer, address(this), _args.maxUncreditedValue);
 
         // Approves the combined amount of credited and uncredited mana the consumer is willing to pay.
         mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + _args.maxCreditedValue);
 
         // Store the mana balance before the external call.
-        uint256 balanceBefore = mana.balanceOf(self);
+        uint256 balanceBefore = mana.balanceOf(address(this));
 
         // Execute the external call.
         (bool success,) = _args.externalCall.target.call(abi.encodeWithSelector(_args.externalCall.selector, _args.externalCall.data));
@@ -440,7 +438,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
 
         // Store how much MANA was transferred out of the contract after the external call.
-        uint256 manaTransferred = balanceBefore - mana.balanceOf(self);
+        uint256 manaTransferred = balanceBefore - mana.balanceOf(address(this));
 
         // Check that mana was transferred out of the contract.
         if (manaTransferred == 0) {
@@ -451,29 +449,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         mana.forceApprove(_args.externalCall.target, 0);
 
         // Keeps track of how much MANA is credited by the credits.
-        uint256 creditedValue = 0;
+        uint256 creditedValue = _validateAndApplyCredits(_args, creditsConsumer, manaTransferred);
 
-        for (uint256 i = 0; i < _args.credits.length; i++) {
-            creditedValue = _handleCredit(_args.credits[i], _args.creditsSignatures[i], creditsConsumer, manaTransferred, creditedValue);
-
-            // If enough credits have been spent, exit early to avoid unnecessary iterations.
-            if (creditedValue == manaTransferred) {
-                break;
-            }
-        }
-
-        // Checks that something was credited.
-        // It could happen that all provided credits were already spent.
-        if (creditedValue == 0) {
-            revert CreditedValueZero();
-        }
-
-        // Checks that the amount of MANA credited is not higher than the maximum amount allowed.
-        if (creditedValue > _args.maxCreditedValue) {
-            revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
-        }
-
-        _handleMaxCreditedValuePerHour(creditedValue);
+        _validateCreditedValue(creditedValue, _args.maxCreditedValue);
 
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
@@ -749,61 +727,79 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         IERC721(contractAddress).safeTransferFrom(address(this), _msgSender(), tokenId);
     }
 
-    function _handleCredit(
-        Credit calldata _credit,
-        bytes calldata _signature,
-        address _creditsConsumer,
-        uint256 _manaTransferred,
-        uint256 _creditedValue
-    ) internal returns (uint256) {
-        if (_credit.value == 0) {
-            revert InvalidCreditValue();
+    function _validateAndApplyCredits(UseCreditsArgs calldata _args, address _creditsConsumer, uint256 _manaTransferred)
+        internal
+        returns (uint256 creditedValue)
+    {
+        for (uint256 i = 0; i < _args.credits.length; i++) {
+            Credit calldata credit = _args.credits[i];
+            bytes calldata signature = _args.creditsSignatures[i];
+
+            if (credit.value == 0) {
+                revert InvalidCreditValue();
+            }
+
+            bytes32 signatureHash = keccak256(signature);
+
+            // Check that the credit has not expired.
+            if (block.timestamp > credit.expiresAt) {
+                revert CreditExpired(signatureHash);
+            }
+
+            // Check that the credit has not been revoked.
+            if (isRevoked[signatureHash]) {
+                revert RevokedCredit(signatureHash);
+            }
+
+            address recoveredSigner = keccak256(abi.encode(_creditsConsumer, block.chainid, address(this), credit)).recover(signature);
+
+            // Check that the signature has been signed by the signer role.
+            if (!hasRole(SIGNER_ROLE, recoveredSigner)) {
+                revert InvalidSignature(signatureHash, recoveredSigner);
+            }
+
+            // Calculate how much of the credit is left to be spent.
+            uint256 creditRemainingValue = credit.value - spentValue[signatureHash];
+
+            // If the credit has been completely spent, skip it.
+            // This is to prevent bids from failing if they contain credits that were consumed on previous calls.
+            if (creditRemainingValue == 0) {
+                return creditedValue;
+            }
+
+            // Calculate how much MANA is left to be credited from the total MANA transferred in the external call.
+            uint256 uncreditedValue = _manaTransferred - creditedValue;
+
+            // Calculate how much of the credit to spend.
+            // If the value of the credit is higher than the required amount, only spend the required amount and leave the rest for future calls.
+            uint256 creditValueToSpend = uncreditedValue < creditRemainingValue ? uncreditedValue : creditRemainingValue;
+
+            // Increment the amount consumed from the credit.
+            spentValue[signatureHash] += creditValueToSpend;
+
+            emit CreditUsed(signatureHash, credit, creditValueToSpend);
+
+            creditedValue += creditValueToSpend;
+
+            // If enough credits have been spent, exit early to avoid unnecessary iterations.
+            if (creditedValue == _manaTransferred) {
+                break;
+            }
         }
-
-        bytes32 signatureHash = keccak256(_signature);
-
-        // Check that the credit has not expired.
-        if (block.timestamp > _credit.expiresAt) {
-            revert CreditExpired(signatureHash);
-        }
-
-        // Check that the credit has not been revoked.
-        if (isRevoked[signatureHash]) {
-            revert RevokedCredit(signatureHash);
-        }
-
-        address recoveredSigner = keccak256(abi.encode(_creditsConsumer, block.chainid, address(this), _credit)).recover(_signature);
-
-        // Check that the signature has been signed by the signer role.
-        if (!hasRole(SIGNER_ROLE, recoveredSigner)) {
-            revert InvalidSignature(signatureHash, recoveredSigner);
-        }
-
-        // Calculate how much of the credit is left to be spent.
-        uint256 creditRemainingValue = _credit.value - spentValue[signatureHash];
-
-        // If the credit has been completely spent, skip it.
-        // This is to prevent bids from failing if they contain credits that were consumed on previous calls.
-        if (creditRemainingValue == 0) {
-            return _creditedValue;
-        }
-
-        // Calculate how much MANA is left to be credited from the total MANA transferred in the external call.
-        uint256 uncreditedValue = _manaTransferred - _creditedValue;
-
-        // Calculate how much of the credit to spend.
-        // If the value of the credit is higher than the required amount, only spend the required amount and leave the rest for future calls.
-        uint256 creditValueToSpend = uncreditedValue < creditRemainingValue ? uncreditedValue : creditRemainingValue;
-
-        // Increment the amount consumed from the credit.
-        spentValue[signatureHash] += creditValueToSpend;
-
-        emit CreditUsed(signatureHash, _credit, creditValueToSpend);
-
-        return _creditedValue + creditValueToSpend;
     }
 
-    function _handleMaxCreditedValuePerHour(uint256 _creditedValue) internal {
+    function _validateCreditedValue(uint256 _creditedValue, uint256 _maxCreditedValue) internal {
+        // Checks that something was credited.
+        // It could happen that all provided credits were already spent.
+        if (_creditedValue == 0) {
+            revert CreditedValueZero();
+        }
+
+        // Checks that the amount of MANA credited is not higher than the maximum amount allowed.
+        if (_creditedValue > _maxCreditedValue) {
+            revert MaxCreditedValueExceeded(_creditedValue, _maxCreditedValue);
+        }
+
         uint256 currentHour = block.timestamp / 1 hours;
         uint256 creditableManaThisHour;
 
