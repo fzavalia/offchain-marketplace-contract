@@ -435,15 +435,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             delete tempMaxUncreditedValue;
         }
 
-        // Handle post execution logic for different targets.
-        //
-        // Legacy Marketplace.
         if (_args.externalCall.target == legacyMarketplace) {
-            (address contractAddress, uint256 tokenId) = abi.decode(_args.externalCall.data, (address, uint256));
-
-            // When an order is executed, the asset is transferred to the caller, which in this case is this contract.
-            // We need to transfer the asset back to the user that is using the credits.
-            IERC721(contractAddress).safeTransferFrom(address(this), creditsConsumer, tokenId);
+            _handleLegacyMarketplacePostExecution(_args);
         }
 
         // Store how much MANA was transferred out of the contract after the external call.
@@ -582,6 +575,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         return _caller == address(this) && bidCreditsSignaturesHash == tempBidCreditsSignaturesHash && maxUncreditedValue == tempMaxUncreditedValue
             && maxCreditedValue == tempMaxCreditedValue;
     }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // ------------------------------ Pre Execution Functions ----------------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------
 
     function _handleLegacyMarketplacePreExecution(UseCreditsArgs calldata _args) internal view {
         // Check that only executeOrder is being called.
@@ -817,6 +814,18 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
             revert InvalidCustomExternalCallSignature(recoveredSigner);
         }
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // ------------------------------ Post Execution Functions ---------------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------
+
+    function _handleLegacyMarketplacePostExecution(UseCreditsArgs calldata _args) internal {
+        (address contractAddress, uint256 tokenId) = abi.decode(_args.externalCall.data, (address, uint256));
+
+        // When an order is executed, the asset is transferred to the caller, which in this case is this contract.
+        // We need to transfer the asset back to the user that is using the credits.
+        IERC721(contractAddress).safeTransferFrom(address(this), _msgSender(), tokenId);
     }
 
     /// @dev This is to update the maximum amount of MANA that can be credited per hour.
