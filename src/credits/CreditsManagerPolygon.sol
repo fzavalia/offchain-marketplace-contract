@@ -427,6 +427,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert ExternalCallFailed(_args.externalCall);
         }
 
+        // If the credits consumer is not the caller, it means that the execution was for a marketplace bid.
+        // In that case, we can delete the temporary values that were set on the pre execution to save gas.
+        if (creditsConsumer != _msgSender()) {
+            delete tempBidCreditsSignaturesHash;
+            delete tempMaxCreditedValue;
+            delete tempMaxUncreditedValue;
+        }
+
         // Handle post execution logic for different targets.
         //
         // Legacy Marketplace.
@@ -436,11 +444,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             // When an order is executed, the asset is transferred to the caller, which in this case is this contract.
             // We need to transfer the asset back to the user that is using the credits.
             IERC721(contractAddress).safeTransferFrom(address(this), creditsConsumer, tokenId);
-        }
-        // Offchain Marketplace.
-        else if (_args.externalCall.target == marketplace && tempBidCreditsSignaturesHash != bytes32(0)) {
-            // To recover some gas after the bid has been executed, we reset the value back to default.
-            delete tempBidCreditsSignaturesHash;
         }
 
         // Store how much MANA was transferred out of the contract after the external call.
@@ -526,11 +529,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
         }
 
-        if (tempMaxCreditedValue != 0) {
-            // Resets the value back to default to optimize gas.
-            delete tempMaxCreditedValue;
-        }
-
         uint256 currentHour = block.timestamp / 1 hours;
         uint256 creditableManaThisHour;
 
@@ -563,11 +561,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             // The transaction reverts if the amount defined by the user is lower than the amount that couldn't be credited.
             if (uncredited > _args.maxUncreditedValue) {
                 revert MaxUncreditedValueExceeded(uncredited, _args.maxUncreditedValue);
-            }
-
-            if (tempMaxUncreditedValue != 0) {
-                // Resets the value back to default to optimize gas.
-                delete tempMaxUncreditedValue;
             }
         }
 
