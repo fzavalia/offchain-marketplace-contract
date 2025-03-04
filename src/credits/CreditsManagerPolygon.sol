@@ -55,7 +55,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice The amount of MANA value used on each credit.
     /// @dev The key is the hash of the credit signature.
-    mapping(bytes32 => uint256) spentValue;
+    mapping(bytes32 => uint256) public spentValue;
 
     /// @notice Maximum amount of MANA that can be credited per hour.
     uint256 public maxManaCreditedPerHour;
