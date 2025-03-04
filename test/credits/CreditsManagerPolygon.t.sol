@@ -881,7 +881,8 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.expectRevert("ERC20: transfer amount exceeds allowance");
         creditsManager.useCredits(args);
@@ -923,7 +924,8 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
@@ -968,12 +970,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.expectRevert(CreditsManagerPolygon.InvalidCreditValue.selector);
         creditsManager.useCredits(args);
@@ -1015,12 +1019,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.CreditExpired.selector, keccak256(creditsSignatures[0])));
         creditsManager.useCredits(args);
@@ -1062,12 +1068,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignatureLength.selector, 0));
         creditsManager.useCredits(args);
@@ -1113,12 +1121,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -1167,12 +1177,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.MaxCreditedValueExceeded.selector, 100 ether, 1 ether));
         creditsManager.useCredits(args);
@@ -1217,12 +1229,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.MaxManaCreditedPerHourExceeded.selector, 100 ether, 101 ether));
         creditsManager.useCredits(args);
@@ -1267,12 +1281,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), type(uint256).max);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         creditsManager.useCredits(args);
 
@@ -1323,12 +1339,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), type(uint256).max);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         creditsManager.useCredits(args);
 
@@ -1377,12 +1395,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         uint256 callerBalanceBefore = IERC20(mana).balanceOf(address(this));
         uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
@@ -1442,12 +1462,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 200 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         uint256 callerBalanceBefore = IERC20(mana).balanceOf(address(this));
         uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
@@ -1528,12 +1550,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         assertEq(creditsManager.spentValue(keccak256(creditsSignatures[0])), 0);
         assertEq(creditsManager.spentValue(keccak256(creditsSignatures[1])), 0);
@@ -1602,12 +1626,14 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
         vm.prank(owner);
         creditsManager.allowCustomExternalCall(address(externalCallTarget), externalCallTarget.someFunction.selector, true);
 
-        vm.store(address(mana), keccak256(abi.encode(address(this), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(this), 1000 ether);
 
         vm.prank(address(this));
         IERC20(mana).approve(address(creditsManager), 99 ether);
 
-        vm.store(address(mana), keccak256(abi.encode(address(creditsManager), uint256(0))), bytes32(uint256(1000 ether)));
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 1000 ether);
 
         assertEq(creditsManager.spentValue(keccak256(creditsSignatures[0])), 0);
         assertEq(creditsManager.spentValue(keccak256(creditsSignatures[1])), 0);
