@@ -421,7 +421,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         if (_args.externalCall.target == legacyMarketplace) {
             _handleLegacyMarketplacePreExecution(_args);
         } else if (_args.externalCall.target == marketplace) {
-            creditsConsumer = _handleMarketplacePreExecution(_args);
+            creditsConsumer = _handleMarketplacePreExecution(_args, creditsConsumer);
         } else if (_args.externalCall.target == collectionStore) {
             _handleCollectionStorePreExecution(_args);
         } else {
@@ -452,8 +452,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _verifyDecentralandCollection(contractAddress);
     }
 
-    function _handleMarketplacePreExecution(UseCreditsArgs memory _args) internal returns (address creditsConsumer) {
-        creditsConsumer = _msgSender();
+    function _handleMarketplacePreExecution(UseCreditsArgs memory _args, address _creditsConsumer) internal returns (address creditsConsumer) {
+        creditsConsumer = _creditsConsumer;
 
         // Cache these flags to prevent multiple storage reads.
         bool memPrimarySalesAllowed = primarySalesAllowed;
