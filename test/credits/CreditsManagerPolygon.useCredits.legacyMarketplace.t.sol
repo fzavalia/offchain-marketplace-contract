@@ -47,11 +47,11 @@ contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerP
         });
 
         // Set the legacy marketplace as approved for the collection.
-        vm.prank(collectionOwner);
+        vm.prank(collectionTokenOwner);
         IERC721(collection).setApprovalForAll(legacyMarketplace, true);
 
         // Create an order on the legacy marketplace.
-        vm.prank(collectionOwner);
+        vm.prank(collectionTokenOwner);
         ITestLegacyMarketplace(legacyMarketplace).createOrder(collection, collectionTokenId, 100 ether, type(uint256).max);
 
         // Transfer MANA to the credits manager.
@@ -59,15 +59,15 @@ contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerP
         IERC20(mana).transfer(address(creditsManager), 100 ether);
 
         uint256 creditsManagerBalanceBefore = IERC20(mana).balanceOf(address(creditsManager));
-        uint256 sellerBalanceBefore = IERC20(mana).balanceOf(collectionOwner);
+        uint256 sellerBalanceBefore = IERC20(mana).balanceOf(collectionTokenOwner);
         uint256 buyerBalanceBefore = IERC20(mana).balanceOf(address(this));
 
-        assertEq(IERC721(collection).ownerOf(collectionTokenId), collectionOwner);
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), collectionTokenOwner);
 
         creditsManager.useCredits(args);
 
         assertEq(IERC20(mana).balanceOf(address(creditsManager)), creditsManagerBalanceBefore - 100 ether);
-        assertEq(IERC20(mana).balanceOf(collectionOwner), sellerBalanceBefore + 100 ether);
+        assertEq(IERC20(mana).balanceOf(collectionTokenOwner), sellerBalanceBefore + 100 ether);
         assertEq(IERC20(mana).balanceOf(address(this)), buyerBalanceBefore);
 
         assertEq(IERC721(collection).ownerOf(collectionTokenId), address(this));
