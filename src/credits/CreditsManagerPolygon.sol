@@ -374,16 +374,17 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @param _args The arguments for the useCredits function.
     function useCredits(UseCreditsArgs calldata _args) external nonReentrant whenNotPaused {
-        // Why use this contract if you don't provide any credits?
+        // Check that the number of credits is not 0.
         if (_args.credits.length == 0) {
             revert NoCredits();
         }
 
+        // Check that the number of credits and the number of signatures are the same.
         if (_args.credits.length != _args.creditsSignatures.length) {
             revert InvalidCreditsSignaturesLength();
         }
 
-        // Credits cannot be used if the amount to be consumed from them is 0.
+        // Check that the maximum amount of MANA that can be credited is not 0.
         if (_args.maxCreditedValue == 0) {
             revert MaxCreditedValueZero();
         }
@@ -395,13 +396,13 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         address creditsConsumer = _msgSender();
 
         if (_args.externalCall.target == legacyMarketplace) {
-            _handleLegacyMarketplace(_args);
+            _handleLegacyMarketplacePreExecution(_args);
         } else if (_args.externalCall.target == marketplace) {
-            creditsConsumer = _handleMarketplace(_args);
+            creditsConsumer = _handleMarketplacePreExecution(_args);
         } else if (_args.externalCall.target == collectionStore) {
-            _handleCollectionStore(_args);
+            _handleCollectionStorePreExecution(_args);
         } else {
-            _handleCustomExternalCall(_args);
+            _handleCustomExternalCallPreExecution(_args);
         }
 
         // Check if the consumer has been denied from using credits.
@@ -592,7 +593,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             && maxCreditedValue == tempMaxCreditedValue;
     }
 
-    function _handleLegacyMarketplace(UseCreditsArgs calldata _args) internal view {
+    function _handleLegacyMarketplacePreExecution(UseCreditsArgs calldata _args) internal view {
         // Check that only executeOrder is being called.
         // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
         if (_args.externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
@@ -610,7 +611,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _verifyDecentralandCollection(contractAddress);
     }
 
-    function _handleMarketplace(UseCreditsArgs memory _args) internal returns (address creditsConsumer) {
+    function _handleMarketplacePreExecution(UseCreditsArgs memory _args) internal returns (address creditsConsumer) {
         creditsConsumer = _msgSender();
 
         // Cache these flags to prevent multiple storage reads.
@@ -771,7 +772,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
-    function _handleCollectionStore(UseCreditsArgs calldata _args) internal view {
+    function _handleCollectionStorePreExecution(UseCreditsArgs calldata _args) internal view {
         // Check that only buy is being called.
         if (_args.externalCall.selector != ICollectionStore.buy.selector) {
             revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
@@ -797,7 +798,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
-    function _handleCustomExternalCall(UseCreditsArgs calldata _args) internal {
+    function _handleCustomExternalCallPreExecution(UseCreditsArgs calldata _args) internal {
         // Check that the external call has been allowed.
         if (!allowedCustomExternalCalls[_args.externalCall.target][_args.externalCall.selector]) {
             revert CustomExternalCallNotAllowed(_args.externalCall.target, _args.externalCall.selector);
