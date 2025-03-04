@@ -420,6 +420,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     // ------------------------------ PRE EXECUTION FUNCTIONS ----------------------------------------------------------
     // -----------------------------------------------------------------------------------------------------------------
 
+    /// @dev Handles all checks that need to be done before executing the external call.
+    /// @param _args The arguments for the useCredits function.
+    /// @return creditsConsumer The address that will finally benefit from the credits.
     function _handlePreExecution(UseCreditsArgs calldata _args) internal returns (address creditsConsumer) {
         // By default the consumer of the credits is the caller of the function.
         // The is a special case for marketplace bids in which the consumer is the signer of the bid instead.
@@ -441,6 +444,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
+    /// @dev Handles all checks that need to be done before executing the external call for the Legacy Marketplace.
+    /// @param _args The arguments for the useCredits function.
     function _handleLegacyMarketplacePreExecution(UseCreditsArgs calldata _args) internal view {
         // Check that only executeOrder is being called.
         // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
@@ -459,6 +464,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _verifyDecentralandCollection(contractAddress);
     }
 
+    /// @dev Handles all checks that need to be done before executing the external call for the Marketplace.
+    /// @param _args The arguments for the useCredits function.
+    /// @param _creditsConsumer The current address that will benefit from the credits.
+    /// @return creditsConsumer The new address that will benefit from the credits in case of bids.
     function _handleMarketplacePreExecution(UseCreditsArgs memory _args, address _creditsConsumer) internal returns (address creditsConsumer) {
         creditsConsumer = _creditsConsumer;
 
@@ -620,6 +629,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
+    /// @dev Handles all checks that need to be done before executing the external call for the Collection Store.
+    /// @param _args The arguments for the useCredits function.
     function _handleCollectionStorePreExecution(UseCreditsArgs calldata _args) internal view {
         // Check that only buy is being called.
         if (_args.externalCall.selector != ICollectionStore.buy.selector) {
@@ -646,6 +657,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
+    /// @dev Handles all checks that need to be done before executing the external call for a custom external call.
+    /// @param _args The arguments for the useCredits function.
     function _handleCustomExternalCallPreExecution(UseCreditsArgs calldata _args) internal {
         // Check that the external call has been allowed.
         if (!allowedCustomExternalCalls[_args.externalCall.target][_args.externalCall.selector]) {
@@ -681,6 +694,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     // ------------------------------ EXECUTION FUNCTIONS --------------------------------------------------------------
     // -----------------------------------------------------------------------------------------------------------------
 
+    /// @dev Executes the external call.
+    /// @param _args The arguments for the useCredits function.
+    /// @param _creditsConsumer The address that will finally benefit from the credits.
+    /// @return manaTransferred The amount of MANA transferred out of the contract after the external call.
     function _executeExternalCall(UseCreditsArgs calldata _args, address _creditsConsumer) internal returns (uint256 manaTransferred) {
         // Transfer the mana the consumer is willing to pay from their wallet to this contract.
         // The consumer will be returned any exceeding amount that was not needed to cover the uncredited amount.
@@ -715,6 +732,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     // ------------------------------ POST EXECUTION FUNCTIONS ---------------------------------------------------------
     // -----------------------------------------------------------------------------------------------------------------
 
+    /// @dev Handles the logic that needs to be done after the external call has been executed.
+    /// @param _args The arguments for the useCredits function.
+    /// @param _creditsConsumer The address that will finally benefit from the credits.
     function _handlePostExecution(UseCreditsArgs calldata _args, address _creditsConsumer) internal {
         // If the credits consumer is not the caller, it means that the execution was for a marketplace bid.
         // In that case, we can delete the temporary values that were set on the pre execution to save gas.
@@ -729,6 +749,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
     }
 
+    /// @dev Handles the logic that needs to be done after the external call has been executed for the Legacy Marketplace.
+    /// @param _args The arguments for the useCredits function.
     function _handleLegacyMarketplacePostExecution(UseCreditsArgs calldata _args) internal {
         (address contractAddress, uint256 tokenId) = abi.decode(_args.externalCall.data, (address, uint256));
 
@@ -741,6 +763,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     // ------------------------------ CREDIT FUNCTIONS -----------------------------------------------------------------
     // -----------------------------------------------------------------------------------------------------------------
 
+    /// @dev Validates and applies the credits.
+    /// @param _args The arguments for the useCredits function.
+    /// @param _creditsConsumer The address that will finally benefit from the credits.
+    /// @param _manaTransferred The amount of MANA transferred out of the contract after the external call.
+    /// @return creditedValue The amount of MANA credited from the credits.
     function _validateAndApplyCredits(UseCreditsArgs calldata _args, address _creditsConsumer, uint256 _manaTransferred)
         internal
         returns (uint256 creditedValue)
@@ -819,6 +846,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         emit CreditsUsed(_manaTransferred, creditedValue);
     }
 
+    /// @dev Validates the amount of MANA credited.
+    /// @param _args The arguments for the useCredits function.
+    /// @param _creditedValue The amount of MANA credited.
     function _validateCreditedValue(UseCreditsArgs calldata _args, uint256 _creditedValue) internal {
         // Checks that something was credited.
         // It could happen that all provided credits were already spent.
@@ -856,6 +886,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         manaCreditedThisHour += _creditedValue;
     }
 
+    /// @dev Handles the uncredited value.
+    /// @param _args The arguments for the useCredits function.
+    /// @param _uncreditedValue The amount of MANA that was not covered by credits.
+    /// @param _creditsConsumer The address that consumed the credits.
     function _handleUncreditedValue(UseCreditsArgs calldata _args, uint256 _uncreditedValue, address _creditsConsumer) internal {
         // If the amount that was not covered by credits is higher than the maximum allowed by the consumer, it reverts.
         if (_uncreditedValue > _args.maxUncreditedValue) {
