@@ -391,245 +391,17 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         address self = address(this);
 
         // By default the consumer of the credits is the caller of the function.
-        // There is a special case for bids in which the consumer is the signer of the bid instead.
+        // The is a special case for marketplace bids in which the consumer is the signer of the bid instead.
         address creditsConsumer = _msgSender();
 
-        {
-            // Cache the values to prevent multiple storage reads.
-            bool memPrimarySalesAllowed = primarySalesAllowed;
-            bool memSecondarySalesAllowed = secondarySalesAllowed;
-
-            // Legacy Marketplace.
-            if (_args.externalCall.target == legacyMarketplace) {
-                // Check that only executeOrder is being called.
-                // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
-                if (_args.externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
-                    revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
-                }
-
-                if (!memSecondarySalesAllowed) {
-                    revert SecondarySalesNotAllowed();
-                }
-
-                // Decode the contract address from the data
-                (address contractAddress) = abi.decode(_args.externalCall.data, (address));
-
-                // Check that the sent assets are decentraland collections items or nfts.
-                _verifyDecentralandCollection(contractAddress);
-            }
-            // Offchain Marketplace.
-            else if (_args.externalCall.target == marketplace) {
-                bool memBidsAllowed = bidsAllowed;
-
-                // Check that only accept or acceptWithCoupon are being called.
-                if (
-                    _args.externalCall.selector != IMarketplace.accept.selector
-                        && _args.externalCall.selector != IMarketplace.acceptWithCoupon.selector
-                ) {
-                    revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
-                }
-
-                // Decode the trades from the data.
-                IMarketplace.Trade[] memory trades = abi.decode(_args.externalCall.data, (IMarketplace.Trade[]));
-
-                // We check that there is at least one trade.
-                if (trades.length == 0) {
-                    revert InvalidTradesLength();
-                }
-
-                // Track if the first trade is a bid or a listing.
-                // Having both type of trades in the same call makes it too complex to handle credit consumption so only trades of the same type are allowed.
-                bool firstTradeIsBid = false;
-
-                for (uint256 i = 0; i < trades.length; i++) {
-                    IMarketplace.Trade memory trade = trades[i];
-
-                    // We have to check if the trade is a valid listing or a valid bid.
-                    //
-                    // Listing:
-                    // - 1 mana asset received by the signer.
-                    // - n amount of decentraland assets sent to the caller.
-                    // Bid:
-                    // - n amount of decentraland assets received by the signer.
-                    // - 1 mana asset sent to the caller.
-                    //
-                    // First we verify if the trade is a listing by checking if the received assets contain only a mana asset.
-                    if (trade.received.length == 1 && trade.received[0].contractAddress == address(mana)) {
-                        // For the second trade onwards, we check that is is not of the opposite type.
-                        // In this case, if the first trade was a bid, it should revert because this one is a listing.
-                        if (i > 0 && firstTradeIsBid) {
-                            revert NotBid();
-                        }
-
-                        uint256 sentLength = trade.sent.length;
-
-                        // We check that there is at least one sent asset.
-                        if (sentLength == 0) {
-                            revert InvalidAssetsLength();
-                        }
-
-                        for (uint256 j = 0; j < sentLength; j++) {
-                            IMarketplace.Asset memory asset = trade.sent[j];
-
-                            // We check that the sent assets are decentraland collections items or nfts.
-                            _verifyDecentralandCollection(asset.contractAddress);
-
-                            if (asset.assetType == ASSET_TYPE_ERC721 && !memSecondarySalesAllowed) {
-                                revert SecondarySalesNotAllowed();
-                            }
-
-                            if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM && !memPrimarySalesAllowed) {
-                                revert PrimarySalesNotAllowed();
-                            }
-
-                            // We check that the beneficiary of the decentraland assets is not 0 so they are not received by this contract.
-                            if (asset.beneficiary == address(0)) {
-                                revert InvalidBeneficiary();
-                            }
-                        }
-                    }
-                    // If it is not a listing, we verify that it is a bid by checking if the sent assets contain only a mana asset.
-                    else if (trade.sent.length == 1 && trade.sent[0].contractAddress == address(mana)) {
-                        if (!memBidsAllowed) {
-                            revert BidsNotAllowed();
-                        }
-
-                        // For the second trade onwards, we check that is is not of the opposite type.
-                        // In this case, if the first trade was a listing, it should revert because this one is a bid.
-                        if (i > 0) {
-                            if (!firstTradeIsBid) {
-                                revert NotListing();
-                            }
-
-                            // If the second trade onwards was not signed by the same address as the first trade, it should revert.
-                            if (trade.signer != creditsConsumer) {
-                                revert OnlyBidsWithSameSignerAllowed();
-                            }
-                        } else {
-                            // Track that the first trade was a bid.
-                            firstTradeIsBid = true;
-
-                            // Given that credits are consumed by one address, to prevent issues, we verify that the signer of all bids is the same.
-                            creditsConsumer = trade.signer;
-                        }
-
-                        uint256 receivedLength = trade.received.length;
-
-                        // We check that there is at least one received asset.
-                        if (receivedLength == 0) {
-                            revert InvalidAssetsLength();
-                        }
-
-                        for (uint256 j = 0; j < receivedLength; j++) {
-                            IMarketplace.Asset memory asset = trade.received[j];
-
-                            // We check that the received assets are decentraland collections items or nfts.
-                            // There is no need to check that the beneficiary is not 0 because the signer (bidder) address will be used in that case.
-                            _verifyDecentralandCollection(asset.contractAddress);
-
-                            if (asset.assetType == ASSET_TYPE_ERC721 && !memSecondarySalesAllowed) {
-                                revert SecondarySalesNotAllowed();
-                            }
-
-                            if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM && !memPrimarySalesAllowed) {
-                                revert PrimarySalesNotAllowed();
-                            }
-                        }
-
-                        // We check that the bid has an external check with this contract to verify that the credits provided are
-                        // the same as the ones the bidder wants to use.
-                        bool hasExternalCheck = false;
-
-                        for (uint256 j = 0; j < trade.checks.externalChecks.length; j++) {
-                            IMarketplace.ExternalCheck memory externalCheck = trade.checks.externalChecks[j];
-
-                            // We check that at least one required external check has this contract as target and is calling the bidExternalCheck function.
-                            if (
-                                externalCheck.contractAddress == address(this) && externalCheck.selector == this.bidExternalCheck.selector
-                                    && externalCheck.required
-                            ) {
-                                hasExternalCheck = true;
-                            }
-                        }
-
-                        // If we can't find the external check, we revert.
-                        if (!hasExternalCheck) {
-                            revert ExternalCheckNotFound();
-                        }
-                    } else {
-                        // Reverts if the trade is not a valid bid or listing.
-                        revert InvalidTrade(trade);
-                    }
-                }
-
-                // Stores the hash of the credits to be consumed on the bid so it can be verified on the external check.
-                tempBidCreditsSignaturesHash = keccak256(abi.encode(_args.creditsSignatures));
-
-                // Stores the maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
-                tempMaxUncreditedValue = _args.maxUncreditedValue;
-
-                // Stores the maximum amount of MANA that can be credited from the provided credits.
-                tempMaxCreditedValue = _args.maxCreditedValue;
-            }
-            // CollectionStore.
-            else if (_args.externalCall.target == collectionStore) {
-                // Check that only buy is being called.
-                if (_args.externalCall.selector != ICollectionStore.buy.selector) {
-                    revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
-                }
-
-                if (!memPrimarySalesAllowed) {
-                    revert PrimarySalesNotAllowed();
-                }
-
-                // Decode the items to buy from the data.
-                ICollectionStore.ItemToBuy[] memory itemsToBuy = abi.decode(_args.externalCall.data, (ICollectionStore.ItemToBuy[]));
-
-                // We check that there is at least one item to buy.
-                if (itemsToBuy.length == 0) {
-                    revert InvalidAssetsLength();
-                }
-
-                for (uint256 i = 0; i < itemsToBuy.length; i++) {
-                    ICollectionStore.ItemToBuy memory itemToBuy = itemsToBuy[i];
-
-                    // We check that the collection has been created by a CollectionFactory and has not been deployed randomly by a malicious actor.
-                    _verifyDecentralandCollection(itemToBuy.collection);
-                }
-            }
-            // Custom external call.
-            // If the target does not match with any of the coded targets, it is considered a custom external call.
-            // These calls can only be performed if they have been allowed by the owner beforehand and have to be signed by a special address.
-            else {
-                // Check that the external call has been allowed.
-                if (!allowedCustomExternalCalls[_args.externalCall.target][_args.externalCall.selector]) {
-                    revert CustomExternalCallNotAllowed(_args.externalCall.target, _args.externalCall.selector);
-                }
-
-                // Check that the external call has not expired.
-                if (block.timestamp > _args.externalCall.expiresAt) {
-                    revert CustomExternalCallExpired(_args.externalCall.expiresAt);
-                }
-
-                bytes32 hashedCustomExternalCallSignature = keccak256(_args.customExternalCallSignature);
-
-                // Check that the external call has not been used yet.
-                if (usedCustomExternalCallSignature[hashedCustomExternalCallSignature]) {
-                    revert UsedCustomExternalCallSignature(hashedCustomExternalCallSignature);
-                }
-
-                // Mark the external call as used.
-                usedCustomExternalCallSignature[hashedCustomExternalCallSignature] = true;
-
-                // Recover the signer of the external call.
-                address recoveredSigner =
-                    keccak256(abi.encode(creditsConsumer, block.chainid, self, _args.externalCall)).recover(_args.customExternalCallSignature);
-
-                // Check that the signer of the external call has the external call signer role.
-                if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
-                    revert InvalidCustomExternalCallSignature(recoveredSigner);
-                }
-            }
+        if (_args.externalCall.target == legacyMarketplace) {
+            _handleLegacyMarketplace(_args);
+        } else if (_args.externalCall.target == marketplace) {
+            creditsConsumer = _handleMarketplace(_args);
+        } else if (_args.externalCall.target == collectionStore) {
+            _handleCollectionStore(_args);
+        } else {
+            _handleCustomExternalCall(_args);
         }
 
         // Check if the consumer has been denied from using credits.
@@ -818,6 +590,242 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
         return _caller == address(this) && bidCreditsSignaturesHash == tempBidCreditsSignaturesHash && maxUncreditedValue == tempMaxUncreditedValue
             && maxCreditedValue == tempMaxCreditedValue;
+    }
+
+    function _handleLegacyMarketplace(UseCreditsArgs calldata _args) internal view {
+        // Check that only executeOrder is being called.
+        // `safeExecuteOrder` is not used on Polygon given that the assets don't validate signatures like with Estates.
+        if (_args.externalCall.selector != ILegacyMarketplace.executeOrder.selector) {
+            revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
+        }
+
+        if (!secondarySalesAllowed) {
+            revert SecondarySalesNotAllowed();
+        }
+
+        // Decode the contract address from the data
+        (address contractAddress) = abi.decode(_args.externalCall.data, (address));
+
+        // Check that the sent assets are decentraland collections items or nfts.
+        _verifyDecentralandCollection(contractAddress);
+    }
+
+    function _handleMarketplace(UseCreditsArgs memory _args) internal returns (address creditsConsumer) {
+        creditsConsumer = _msgSender();
+
+        // Cache these flags to prevent multiple storage reads.
+        bool memPrimarySalesAllowed = primarySalesAllowed;
+        bool memSecondarySalesAllowed = secondarySalesAllowed;
+        bool memBidsAllowed = bidsAllowed;
+
+        // Check that only accept or acceptWithCoupon are being called.
+        if (_args.externalCall.selector != IMarketplace.accept.selector && _args.externalCall.selector != IMarketplace.acceptWithCoupon.selector) {
+            revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
+        }
+
+        // Decode the trades from the data.
+        IMarketplace.Trade[] memory trades = abi.decode(_args.externalCall.data, (IMarketplace.Trade[]));
+
+        // We check that there is at least one trade.
+        if (trades.length == 0) {
+            revert InvalidTradesLength();
+        }
+
+        // Track if the first trade is a bid or a listing.
+        // Having both type of trades in the same call makes it too complex to handle credit consumption so only trades of the same type are allowed.
+        bool firstTradeIsBid = false;
+
+        for (uint256 i = 0; i < trades.length; i++) {
+            IMarketplace.Trade memory trade = trades[i];
+
+            // We have to check if the trade is a valid listing or a valid bid.
+            //
+            // Listing:
+            // - 1 mana asset received by the signer.
+            // - n amount of decentraland assets sent to the caller.
+            // Bid:
+            // - n amount of decentraland assets received by the signer.
+            // - 1 mana asset sent to the caller.
+            //
+            // First we verify if the trade is a listing by checking if the received assets contain only a mana asset.
+            if (trade.received.length == 1 && trade.received[0].contractAddress == address(mana)) {
+                // For the second trade onwards, we check that is is not of the opposite type.
+                // In this case, if the first trade was a bid, it should revert because this one is a listing.
+                if (i > 0 && firstTradeIsBid) {
+                    revert NotBid();
+                }
+
+                uint256 sentLength = trade.sent.length;
+
+                // We check that there is at least one sent asset.
+                if (sentLength == 0) {
+                    revert InvalidAssetsLength();
+                }
+
+                for (uint256 j = 0; j < sentLength; j++) {
+                    IMarketplace.Asset memory asset = trade.sent[j];
+
+                    // We check that the sent assets are decentraland collections items or nfts.
+                    _verifyDecentralandCollection(asset.contractAddress);
+
+                    if (asset.assetType == ASSET_TYPE_ERC721 && !memSecondarySalesAllowed) {
+                        revert SecondarySalesNotAllowed();
+                    }
+
+                    if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM && !memPrimarySalesAllowed) {
+                        revert PrimarySalesNotAllowed();
+                    }
+
+                    // We check that the beneficiary of the decentraland assets is not 0 so they are not received by this contract.
+                    if (asset.beneficiary == address(0)) {
+                        revert InvalidBeneficiary();
+                    }
+                }
+            }
+            // If it is not a listing, we verify that it is a bid by checking if the sent assets contain only a mana asset.
+            else if (trade.sent.length == 1 && trade.sent[0].contractAddress == address(mana)) {
+                if (!memBidsAllowed) {
+                    revert BidsNotAllowed();
+                }
+
+                // For the second trade onwards, we check that is is not of the opposite type.
+                // In this case, if the first trade was a listing, it should revert because this one is a bid.
+                if (i > 0) {
+                    if (!firstTradeIsBid) {
+                        revert NotListing();
+                    }
+
+                    // If the second trade onwards was not signed by the same address as the first trade, it should revert.
+                    if (trade.signer != creditsConsumer) {
+                        revert OnlyBidsWithSameSignerAllowed();
+                    }
+                } else {
+                    // Track that the first trade was a bid.
+                    firstTradeIsBid = true;
+
+                    // Given that credits are consumed by one address, to prevent issues, we verify that the signer of all bids is the same.
+                    creditsConsumer = trade.signer;
+                }
+
+                uint256 receivedLength = trade.received.length;
+
+                // We check that there is at least one received asset.
+                if (receivedLength == 0) {
+                    revert InvalidAssetsLength();
+                }
+
+                for (uint256 j = 0; j < receivedLength; j++) {
+                    IMarketplace.Asset memory asset = trade.received[j];
+
+                    // We check that the received assets are decentraland collections items or nfts.
+                    // There is no need to check that the beneficiary is not 0 because the signer (bidder) address will be used in that case.
+                    _verifyDecentralandCollection(asset.contractAddress);
+
+                    if (asset.assetType == ASSET_TYPE_ERC721 && !memSecondarySalesAllowed) {
+                        revert SecondarySalesNotAllowed();
+                    }
+
+                    if (asset.assetType == ASSET_TYPE_COLLECTION_ITEM && !memPrimarySalesAllowed) {
+                        revert PrimarySalesNotAllowed();
+                    }
+                }
+
+                // We check that the bid has an external check with this contract to verify that the credits provided are
+                // the same as the ones the bidder wants to use.
+                bool hasExternalCheck = false;
+
+                for (uint256 j = 0; j < trade.checks.externalChecks.length; j++) {
+                    IMarketplace.ExternalCheck memory externalCheck = trade.checks.externalChecks[j];
+
+                    // We check that at least one required external check has this contract as target and is calling the bidExternalCheck function.
+                    if (
+                        externalCheck.contractAddress == address(this) && externalCheck.selector == this.bidExternalCheck.selector
+                            && externalCheck.required
+                    ) {
+                        hasExternalCheck = true;
+                    }
+                }
+
+                // If we can't find the external check, we revert.
+                if (!hasExternalCheck) {
+                    revert ExternalCheckNotFound();
+                }
+            } else {
+                // Reverts if the trade is not a valid bid or listing.
+                revert InvalidTrade(trade);
+            }
+        }
+
+        // If the first trade is a bid and code has reached this point, it means that all trades are valid bids.
+        if (firstTradeIsBid) {
+            // Stores different storage values that are going to be validated on the `bidExternalCheck` call.
+            //
+            // Stores the hash of the credits to be consumed on the bid so it can be verified on the external check.
+            tempBidCreditsSignaturesHash = keccak256(abi.encode(_args.creditsSignatures));
+
+            // Stores the maximum amount of MANA the bidder is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
+            tempMaxUncreditedValue = _args.maxUncreditedValue;
+
+            // Stores the maximum amount of MANA that can be credited from the provided credits.
+            tempMaxCreditedValue = _args.maxCreditedValue;
+        }
+    }
+
+    function _handleCollectionStore(UseCreditsArgs calldata _args) internal view {
+        // Check that only buy is being called.
+        if (_args.externalCall.selector != ICollectionStore.buy.selector) {
+            revert InvalidExternalCallSelector(_args.externalCall.target, _args.externalCall.selector);
+        }
+
+        if (!primarySalesAllowed) {
+            revert PrimarySalesNotAllowed();
+        }
+
+        // Decode the items to buy from the data.
+        ICollectionStore.ItemToBuy[] memory itemsToBuy = abi.decode(_args.externalCall.data, (ICollectionStore.ItemToBuy[]));
+
+        // We check that there is at least one item to buy.
+        if (itemsToBuy.length == 0) {
+            revert InvalidAssetsLength();
+        }
+
+        for (uint256 i = 0; i < itemsToBuy.length; i++) {
+            ICollectionStore.ItemToBuy memory itemToBuy = itemsToBuy[i];
+
+            // We check that the collection has been created by a CollectionFactory and has not been deployed randomly by a malicious actor.
+            _verifyDecentralandCollection(itemToBuy.collection);
+        }
+    }
+
+    function _handleCustomExternalCall(UseCreditsArgs calldata _args) internal {
+        // Check that the external call has been allowed.
+        if (!allowedCustomExternalCalls[_args.externalCall.target][_args.externalCall.selector]) {
+            revert CustomExternalCallNotAllowed(_args.externalCall.target, _args.externalCall.selector);
+        }
+
+        // Check that the external call has not expired.
+        if (block.timestamp > _args.externalCall.expiresAt) {
+            revert CustomExternalCallExpired(_args.externalCall.expiresAt);
+        }
+
+        bytes32 hashedCustomExternalCallSignature = keccak256(_args.customExternalCallSignature);
+
+        // Check that the external call has not been used yet.
+        if (usedCustomExternalCallSignature[hashedCustomExternalCallSignature]) {
+            revert UsedCustomExternalCallSignature(hashedCustomExternalCallSignature);
+        }
+
+        // Mark the external call as used.
+        usedCustomExternalCallSignature[hashedCustomExternalCallSignature] = true;
+
+        // Recover the signer of the external call.
+        address recoveredSigner =
+            keccak256(abi.encode(_msgSender(), block.chainid, address(this), _args.externalCall)).recover(_args.customExternalCallSignature);
+
+        // Check that the signer of the external call has the external call signer role.
+        if (!hasRole(EXTERNAL_CALL_SIGNER_ROLE, recoveredSigner)) {
+            revert InvalidCustomExternalCallSignature(recoveredSigner);
+        }
     }
 
     /// @dev This is to update the maximum amount of MANA that can be credited per hour.
