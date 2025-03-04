@@ -8,6 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 import {NativeMetaTransaction, EIP712} from "src/common/NativeMetaTransaction.sol";
 import {IMarketplace} from "src/credits/interfaces/IMarketplace.sol";
@@ -15,7 +16,7 @@ import {ILegacyMarketplace} from "src/credits/interfaces/ILegacyMarketplace.sol"
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 import {ICollectionStore} from "src/credits/interfaces/ICollectionStore.sol";
 
-contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction {
+contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, NativeMetaTransaction, IERC721Receiver {
     using ECDSA for bytes32;
     using SafeERC20 for IERC20;
 
@@ -409,6 +410,12 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             && maxCreditedValue == tempMaxCreditedValue;
     }
 
+    /// @notice Allows the contract to receive ERC721 tokens.
+    /// @dev Required for the Legacy Marketplace to work given that the purchased asset is transferred to this contract.
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
     // -----------------------------------------------------------------------------------------------------------------
     // ------------------------------ PRE EXECUTION FUNCTIONS ----------------------------------------------------------
     // -----------------------------------------------------------------------------------------------------------------
@@ -686,7 +693,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         uint256 balanceBefore = mana.balanceOf(address(this));
 
         // Execute the external call.
-        (bool success,) = _args.externalCall.target.call(abi.encodeWithSelector(_args.externalCall.selector, _args.externalCall.data));
+        (bool success,) = _args.externalCall.target.call(abi.encodePacked(_args.externalCall.selector, _args.externalCall.data));
 
         if (!success) {
             revert ExternalCallFailed(_args.externalCall);
