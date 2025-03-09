@@ -11,7 +11,6 @@ contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
         uint256 _maxManaCreditedPerHour,
         bool _primarySalesAllowed,
         bool _secondarySalesAllowed,
-        bool _bidsAllowed,
         IERC20 _mana,
         address _marketplace,
         address _legacyMarketplace,
@@ -24,7 +23,6 @@ contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
             _maxManaCreditedPerHour,
             _primarySalesAllowed,
             _secondarySalesAllowed,
-            _bidsAllowed,
             _mana,
             _marketplace,
             _legacyMarketplace,
@@ -33,16 +31,4 @@ contract CreditsManagerPolygonHarness is CreditsManagerPolygon {
             _collectionFactoryV3
         )
     {}
-
-    function updateTempBidCreditsSignaturesHash(bytes32 _tempBidCreditsSignaturesHash) external {
-        tempBidCreditsSignaturesHash = _tempBidCreditsSignaturesHash;
-    }
-
-    function updateTempMaxUncreditedValue(uint256 _tempMaxUncreditedValue) external {
-        tempMaxUncreditedValue = _tempMaxUncreditedValue;
-    }
-
-    function updateTempMaxCreditedValue(uint256 _tempMaxCreditedValue) external {
-        tempMaxCreditedValue = _tempMaxCreditedValue;
-    }
 }

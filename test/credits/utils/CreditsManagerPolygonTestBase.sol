@@ -80,7 +80,6 @@ contract CreditsManagerPolygonTestBase is Test {
         maxManaCreditedPerHour = 100 ether;
         primarySalesAllowed = true;
         secondarySalesAllowed = true;
-        bidsAllowed = true;
         marketplace = 0x540fb08eDb56AaE562864B390542C97F562825BA;
         legacyMarketplace = 0x480a0f4e360E8964e68858Dd231c2922f1df45Ef;
         collectionStore = 0x214ffC0f0103735728dc66b61A22e4F163e275ae;
@@ -92,7 +91,6 @@ contract CreditsManagerPolygonTestBase is Test {
             maxManaCreditedPerHour,
             primarySalesAllowed,
             secondarySalesAllowed,
-            bidsAllowed,
             IERC20(mana),
             marketplace,
             legacyMarketplace,
