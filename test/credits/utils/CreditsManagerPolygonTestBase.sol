@@ -40,8 +40,6 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     uint256 internal collectionItemId;
     address internal collectionCreator;
 
-    address internal other;
-
     address internal seller;
     uint256 internal sellerPk;
 
@@ -115,7 +113,6 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
         collectionTokenOwner = 0xFE705eaD02E849E78278C50de3d939bE23448F1a;
         collectionCreator = 0xFE705eaD02E849E78278C50de3d939bE23448F1a;
 
-        other = makeAddr("other");
         (seller, sellerPk) = makeAddrAndKey("seller");
     }
 }

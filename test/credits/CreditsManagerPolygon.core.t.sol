@@ -276,10 +276,10 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(IERC721(collection).ownerOf(collectionTokenId), address(creditsManager));
 
         vm.expectEmit(address(creditsManager));
-        emit ERC721Withdrawn(collection, collectionTokenId, other);
+        emit ERC721Withdrawn(collection, collectionTokenId, address(this));
         vm.prank(owner);
-        creditsManager.withdrawERC721(collection, collectionTokenId, other);
+        creditsManager.withdrawERC721(collection, collectionTokenId, address(this));
 
-        assertEq(IERC721(collection).ownerOf(collectionTokenId), other);
+        assertEq(IERC721(collection).ownerOf(collectionTokenId), address(this));
     }
 }
