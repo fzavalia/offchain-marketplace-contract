@@ -429,7 +429,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @dev Handles all checks that need to be done before executing the external call for the Marketplace.
     /// @param _args The arguments for the useCredits function.
-    function _handleMarketplacePreExecution(UseCreditsArgs memory _args) internal {
+    function _handleMarketplacePreExecution(UseCreditsArgs memory _args) internal view {
         // Cache these flags to prevent multiple storage reads.
         bool memPrimarySalesAllowed = primarySalesAllowed;
         bool memSecondarySalesAllowed = secondarySalesAllowed;
