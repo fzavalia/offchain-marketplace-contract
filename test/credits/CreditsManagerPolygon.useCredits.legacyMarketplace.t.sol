@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPolygonTestBase.sol";
 import {ILegacyMarketplace} from "src/credits/interfaces/ILegacyMarketplace.sol";
@@ -13,11 +12,7 @@ interface ITestLegacyMarketplace is ILegacyMarketplace {
     function createOrder(address _nftAddress, uint256 _assetId, uint256 _priceInWei, uint256 _expiresAt) external;
 }
 
-contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerPolygonTestBase, IERC721Receiver {
-    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
-        return this.onERC721Received.selector;
-    }
-
+contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerPolygonTestBase {
     function test_useCredits_Success() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 

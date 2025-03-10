@@ -4,11 +4,12 @@ pragma solidity 0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {CreditsManagerPolygon} from "src/credits/CreditsManagerPolygon.sol";
 import {ICollectionFactory} from "src/credits/interfaces/ICollectionFactory.sol";
 import {CreditsManagerPolygonHarness} from "test/credits/utils/CreditsManagerPolygonHarness.sol";
 
-contract CreditsManagerPolygonTestBase is Test {
+contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     address internal owner;
     address internal signer;
     uint256 internal signerPk;
@@ -41,6 +42,9 @@ contract CreditsManagerPolygonTestBase is Test {
 
     address internal other;
 
+    address internal seller;
+    uint256 internal sellerPk;
+
     event UserDenied(address indexed _user);
     event UserAllowed(address indexed _user);
     event CreditRevoked(bytes32 indexed _creditId);
@@ -54,6 +58,10 @@ contract CreditsManagerPolygonTestBase is Test {
     event CreditsUsed(uint256 _manaTransferred, uint256 _creditedValue);
     event ERC20Withdrawn(address indexed _token, uint256 _amount, address indexed _to);
     event ERC721Withdrawn(address indexed _collection, uint256 _tokenId, address indexed _to);
+
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
 
     function setUp() public {
         vm.selectFork(vm.createFork("https://rpc.decentraland.org/polygon", 68650527)); // Mar-04-2025 09:10:51 PM +UTC
@@ -108,5 +116,6 @@ contract CreditsManagerPolygonTestBase is Test {
         collectionCreator = 0xFE705eaD02E849E78278C50de3d939bE23448F1a;
 
         other = makeAddr("other");
+        (seller, sellerPk) = makeAddrAndKey("seller");
     }
 }
