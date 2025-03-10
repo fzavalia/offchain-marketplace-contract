@@ -41,6 +41,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Asset type for ERC20 tokens for the Marketplace Trade struct.
     uint256 public constant ASSET_TYPE_ERC20 = 1;
 
+    /// @notice Asset type for USD pegged MANA for the Marketplace Trade struct.
+    uint256 public constant ASSET_TYPE_USD_PEGGED_MANA = 2;
+
     /// @notice Asset type for NFTs for the Marketplace Trade struct.
     uint256 public constant ASSET_TYPE_ERC721 = 3;
 
@@ -456,7 +459,10 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             // - n amount of decentraland assets sent to the caller.
             //
             // First we check that the received assets are composed of only 1 mana asset.
-            if (trade.received.length != 1 || trade.received[0].contractAddress != address(mana) || trade.received[0].assetType != ASSET_TYPE_ERC20) {
+            if (
+                trade.received.length != 1 || trade.received[0].contractAddress != address(mana)
+                    || (trade.received[0].assetType != ASSET_TYPE_ERC20 && trade.received[0].assetType != ASSET_TYPE_USD_PEGGED_MANA)
+            ) {
                 revert InvalidTrade(trade);
             }
 
