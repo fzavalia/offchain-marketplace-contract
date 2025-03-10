@@ -13,6 +13,132 @@ interface ITestLegacyMarketplace is ILegacyMarketplace {
 }
 
 contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerPolygonTestBase {
+    function test_useCredits_RevertsWhenNotDecentralandNFTOrItem() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+
+        creditsSignatures[0] = abi.encodePacked(r, s, v);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: legacyMarketplace,
+            selector: ILegacyMarketplace.executeOrder.selector,
+            data: abi.encode(address(0), collectionTokenId, uint256(100 ether)),
+            expiresAt: 0,
+            salt: bytes32(0)
+        });
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: bytes(""),
+            maxUncreditedValue: 0,
+            maxCreditedValue: 100 ether
+        });
+
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).setApprovalForAll(legacyMarketplace, true);
+
+        vm.prank(collectionTokenOwner);
+        ITestLegacyMarketplace(legacyMarketplace).createOrder(collection, collectionTokenId, 100 ether, type(uint256).max);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 100 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.NotDecentralandCollection.selector, address(0)));
+        creditsManager.useCredits(args);
+    }
+
+    function test_useCredits_RevertsWhenSecondarySalesAreNotAllowed() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+
+        creditsSignatures[0] = abi.encodePacked(r, s, v);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: legacyMarketplace,
+            selector: ILegacyMarketplace.executeOrder.selector,
+            data: abi.encode(collection, collectionTokenId, uint256(100 ether)),
+            expiresAt: 0,
+            salt: bytes32(0)
+        });
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: bytes(""),
+            maxUncreditedValue: 0,
+            maxCreditedValue: 100 ether
+        });
+
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).setApprovalForAll(legacyMarketplace, true);
+
+        vm.prank(collectionTokenOwner);
+        ITestLegacyMarketplace(legacyMarketplace).createOrder(collection, collectionTokenId, 100 ether, type(uint256).max);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 100 ether);
+
+        vm.prank(owner);
+        creditsManager.updateSecondarySalesAllowed(false);
+
+        vm.expectRevert(CreditsManagerPolygon.SecondarySalesNotAllowed.selector);
+        creditsManager.useCredits(args);
+    }
+
+    function test_useCredits_RevertsWhenSelectorIsInvalid() public {
+        CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
+
+        credits[0] = CreditsManagerPolygon.Credit({value: 100 ether, expiresAt: type(uint256).max, salt: bytes32(0)});
+
+        bytes[] memory creditsSignatures = new bytes[](1);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+
+        creditsSignatures[0] = abi.encodePacked(r, s, v);
+
+        CreditsManagerPolygon.ExternalCall memory externalCall = CreditsManagerPolygon.ExternalCall({
+            target: legacyMarketplace,
+            selector: bytes4(0),
+            data: abi.encode(collection, collectionTokenId, uint256(100 ether)),
+            expiresAt: 0,
+            salt: bytes32(0)
+        });
+
+        CreditsManagerPolygon.UseCreditsArgs memory args = CreditsManagerPolygon.UseCreditsArgs({
+            credits: credits,
+            creditsSignatures: creditsSignatures,
+            externalCall: externalCall,
+            customExternalCallSignature: bytes(""),
+            maxUncreditedValue: 0,
+            maxCreditedValue: 100 ether
+        });
+
+        vm.prank(collectionTokenOwner);
+        IERC721(collection).setApprovalForAll(legacyMarketplace, true);
+
+        vm.prank(collectionTokenOwner);
+        ITestLegacyMarketplace(legacyMarketplace).createOrder(collection, collectionTokenId, 100 ether, type(uint256).max);
+
+        vm.prank(manaHolder);
+        IERC20(mana).transfer(address(creditsManager), 100 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.InvalidExternalCallSelector.selector, legacyMarketplace, bytes4(0)));
+        creditsManager.useCredits(args);
+    }
+
     function test_useCredits_Success() public {
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
 
@@ -41,15 +167,12 @@ contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerP
             maxCreditedValue: 100 ether
         });
 
-        // Set the legacy marketplace as approved for the collection.
         vm.prank(collectionTokenOwner);
         IERC721(collection).setApprovalForAll(legacyMarketplace, true);
 
-        // Create an order on the legacy marketplace.
         vm.prank(collectionTokenOwner);
         ITestLegacyMarketplace(legacyMarketplace).createOrder(collection, collectionTokenId, 100 ether, type(uint256).max);
 
-        // Transfer MANA to the credits manager.
         vm.prank(manaHolder);
         IERC20(mana).transfer(address(creditsManager), 100 ether);
 
