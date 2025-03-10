@@ -104,4 +104,344 @@ The contract supports four types of external calls:
 - **Denial Capability**: Ability to deny malicious users from using the system
 
 ## Usage Examples
-*Detailed usage examples will be added in a future update*
+
+The following examples demonstrate how to use the `useCredits` function with different types of external calls. Each example follows the same basic pattern:
+
+1. Create and sign one or more credits
+2. Prepare the external call data
+3. Call the `useCredits` function
+
+### 1. Collection Store External Call
+
+```javascript
+// 1. Create and sign a credit
+const credit = {
+  value: ethers.utils.parseEther("100"),  // 100 MANA
+  expiresAt: Math.floor(Date.now() / 1000) + 86400, // Expires in 24 hours
+  salt: ethers.utils.randomBytes(32)  // Random salt for uniqueness
+};
+
+const message = ethers.utils.solidityKeccak256(
+  [
+    { name: "user", type: "address" },
+    { name: "chainId", type: "uint256" },
+    { name: "creditsManager", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "expiresAt", type: "uint256" },
+    { name: "salt", type: "bytes32" }
+  ],
+  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+);
+const signature = await signer.signMessage(ethers.utils.arrayify(message));
+
+// 2. Prepare Collection Store external call
+const itemsToBuy = [{
+  collection: collectionAddress,  // Must be a Decentraland collection
+  ids: [itemId],
+  prices: [ethers.utils.parseEther("50")],  // 50 MANA
+  beneficiaries: [userAddress]
+}];
+
+const externalCall = {
+  target: collectionStoreAddress,
+  selector: "0xa4fdc78a", // buy function selector
+  data: ethers.utils.defaultAbiCoder.encode(
+    [{
+      type: "tuple[]",
+      components: [
+        { name: "collection", type: "address" },
+        { name: "ids", type: "uint256[]" },
+        { name: "prices", type: "uint256[]" },
+        { name: "beneficiaries", type: "address[]" }
+      ]
+    }],
+    [itemsToBuy]
+  ),
+  expiresAt: 0,  // Not needed for collection store calls
+  salt: ethers.utils.hexZeroPad("0x", 32)  // Not needed for collection store calls
+};
+
+// 3. Call useCredits
+const useCreditsArgs = {
+  credits: [credit],
+  creditsSignatures: [signature],
+  externalCall: externalCall,
+  customExternalCallSignature: "0x",  // Not needed for collection store calls
+  maxUncreditedValue: 0,  // User won't pay anything from their wallet
+  maxCreditedValue: ethers.utils.parseEther("50")  // Maximum amount to use from credits
+};
+
+await creditsManager.useCredits(useCreditsArgs);
+```
+
+### 2. Marketplace External Call
+
+```javascript
+// 1. Create and sign a credit
+const credit = {
+  value: ethers.utils.parseEther("100"),
+  expiresAt: Math.floor(Date.now() / 1000) + 86400,
+  salt: ethers.utils.randomBytes(32)
+};
+
+const message = ethers.utils.solidityKeccak256(
+  [
+    { name: "user", type: "address" },
+    { name: "chainId", type: "uint256" },
+    { name: "creditsManager", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "expiresAt", type: "uint256" },
+    { name: "salt", type: "bytes32" }
+  ],
+  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+);
+const signature = await signer.signMessage(ethers.utils.arrayify(message));
+
+// 2. Prepare Marketplace external call
+// Create a trade object following the IMarketplace.Trade structure
+// Note: In a real implementation, you would need to properly sign this trade
+// This example focuses only on the structure and encoding
+const trade = {
+  signer: sellerAddress,
+  signature: "0x...", // In a real implementation, this would be a valid signature
+  checks: {
+    uses: 1,
+    expiration: ethers.constants.MaxUint256,
+    effective: 0,
+    salt: ethers.utils.hexZeroPad("0x", 32),
+    contractSignatureIndex: 0,
+    signerSignatureIndex: 0,
+    allowedRoot: ethers.utils.hexZeroPad("0x", 32),
+    allowedProof: [],
+    externalChecks: []
+  },
+  sent: [
+    {
+      assetType: 3, // ASSET_TYPE_ERC721
+      contractAddress: nftCollectionAddress, // Must be a Decentraland collection
+      value: nftTokenId,
+      beneficiary: userAddress,
+      extra: "0x"
+    }
+  ],
+  received: [
+    {
+      assetType: 1, // ASSET_TYPE_ERC20
+      contractAddress: manaAddress,
+      value: ethers.utils.parseEther("100"),
+      beneficiary: ethers.constants.AddressZero, // Will be filled by marketplace
+      extra: "0x"
+    }
+  ]
+};
+
+// Create the trades array
+const trades = [trade];
+
+// Create the external call with properly encoded data
+const externalCall = {
+  target: marketplaceAddress,
+  selector: "0x961a547e", // accept function selector
+  data: ethers.utils.defaultAbiCoder.encode(
+    [{
+      type: "tuple[]",
+      components: [
+        { name: "signer", type: "address" },
+        { name: "signature", type: "bytes" },
+        { 
+          name: "checks", 
+          type: "tuple",
+          components: [
+            { name: "uses", type: "uint256" },
+            { name: "expiration", type: "uint256" },
+            { name: "effective", type: "uint256" },
+            { name: "salt", type: "bytes32" },
+            { name: "contractSignatureIndex", type: "uint256" },
+            { name: "signerSignatureIndex", type: "uint256" },
+            { name: "allowedRoot", type: "bytes32" },
+            { name: "allowedProof", type: "bytes32[]" },
+            { 
+              name: "externalChecks", 
+              type: "tuple[]",
+              components: [
+                { name: "contractAddress", type: "address" },
+                { name: "selector", type: "bytes4" },
+                { name: "value", type: "bytes" },
+                { name: "required", type: "bool" }
+              ]
+            }
+          ]
+        },
+        { 
+          name: "sent", 
+          type: "tuple[]",
+          components: [
+            { name: "assetType", type: "uint256" },
+            { name: "contractAddress", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "beneficiary", type: "address" },
+            { name: "extra", type: "bytes" }
+          ]
+        },
+        { 
+          name: "received", 
+          type: "tuple[]",
+          components: [
+            { name: "assetType", type: "uint256" },
+            { name: "contractAddress", type: "address" },
+            { name: "value", type: "uint256" },
+            { name: "beneficiary", type: "address" },
+            { name: "extra", type: "bytes" }
+          ]
+        }
+      ]
+    }],
+    [trades]
+  ),
+  expiresAt: 0, // Not needed for marketplace calls
+  salt: ethers.utils.hexZeroPad("0x", 32) // Not needed for marketplace calls
+};
+
+// 3. Call useCredits
+const useCreditsArgs = {
+  credits: [credit],
+  creditsSignatures: [signature],
+  externalCall: externalCall,
+  customExternalCallSignature: "0x", // Not needed for marketplace calls
+  maxUncreditedValue: 0,
+  maxCreditedValue: ethers.utils.parseEther("100")
+};
+
+await creditsManager.useCredits(useCreditsArgs);
+```
+
+### 3. Legacy Marketplace External Call
+
+```javascript
+// 1. Create and sign a credit
+const credit = {
+  value: ethers.utils.parseEther("100"),
+  expiresAt: Math.floor(Date.now() / 1000) + 86400,
+  salt: ethers.utils.randomBytes(32)
+};
+
+const message = ethers.utils.solidityKeccak256(
+  [
+    { name: "user", type: "address" },
+    { name: "chainId", type: "uint256" },
+    { name: "creditsManager", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "expiresAt", type: "uint256" },
+    { name: "salt", type: "bytes32" }
+  ],
+  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+);
+const signature = await signer.signMessage(ethers.utils.arrayify(message));
+
+// 2. Prepare Legacy Marketplace external call
+const legacyTrade = {
+  nftAddress: nftCollectionAddress, // Must be a Decentraland collection
+  tokenId: nftTokenId,
+  price: ethers.utils.parseEther("100"),
+  seller: sellerAddress
+};
+
+const externalCall = {
+  target: legacyMarketplaceAddress,
+  selector: "0xae7b0333", // executeOrder function selector
+  data: ethers.utils.defaultAbiCoder.encode(
+    [{
+      type: "tuple",
+      components: [
+        { name: "seller", type: "address" },
+        { name: "tokenId", type: "uint256" },
+        { name: "price", type: "uint256" },
+        { name: "buyer", type: "address" }
+      ]
+    }], 
+    [legacyTrade]
+  ),
+  expiresAt: 0, // Not needed for legacy marketplace calls
+  salt: ethers.utils.hexZeroPad("0x", 32) // Not needed for legacy marketplace calls
+};
+
+// 3. Call useCredits
+const useCreditsArgs = {
+  credits: [credit],
+  creditsSignatures: [signature],
+  externalCall: externalCall,
+  customExternalCallSignature: "0x", // Not needed for legacy marketplace calls
+  maxUncreditedValue: 0,
+  maxCreditedValue: ethers.utils.parseEther("100")
+};
+
+await creditsManager.useCredits(useCreditsArgs);
+```
+
+### 4. Custom External Call
+
+```javascript
+// 1. Create and sign a credit
+const credit = {
+  value: ethers.utils.parseEther("100"),
+  expiresAt: Math.floor(Date.now() / 1000) + 86400,
+  salt: ethers.utils.randomBytes(32)
+};
+
+const creditMessage = ethers.utils.solidityKeccak256(
+  [
+    { name: "user", type: "address" },
+    { name: "chainId", type: "uint256" },
+    { name: "creditsManager", type: "address" },
+    { name: "value", type: "uint256" },
+    { name: "expiresAt", type: "uint256" },
+    { name: "salt", type: "bytes32" }
+  ],
+  [userAddress, chainId, creditsManagerAddress, credit.value, credit.expiresAt, credit.salt]
+);
+const creditSignature = await signer.signMessage(ethers.utils.arrayify(creditMessage));
+
+// 2. Prepare Custom external call (must be pre-approved by admin)
+const externalCall = {
+  target: customContractAddress,
+  selector: "0x12345678", // Function selector of the custom contract
+  data: ethers.utils.defaultAbiCoder.encode(
+    [
+      { name: "amount", type: "uint256" },
+      { name: "recipient", type: "address" }
+    ],
+    [100, userAddress]
+  ),
+  expiresAt: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+  salt: ethers.utils.randomBytes(32)
+};
+
+// 3. Get the external call signed by an authorized external call signer
+const externalCallMessage = ethers.utils.solidityKeccak256(
+  [
+    { name: "user", type: "address" },
+    { name: "chainId", type: "uint256" },
+    { name: "creditsManager", type: "address" },
+    { name: "target", type: "address" },
+    { name: "selector", type: "bytes4" },
+    { name: "data", type: "bytes" },
+    { name: "expiresAt", type: "uint256" },
+    { name: "salt", type: "bytes32" }
+  ],
+  [userAddress, chainId, creditsManagerAddress, externalCall.target, externalCall.selector, 
+   externalCall.data, externalCall.expiresAt, externalCall.salt]
+);
+const externalCallSignature = await externalCallSigner.signMessage(ethers.utils.arrayify(externalCallMessage));
+
+// 4. Call useCredits
+const useCreditsArgs = {
+  credits: [credit],
+  creditsSignatures: [creditSignature],
+  externalCall: externalCall,
+  customExternalCallSignature: externalCallSignature, // Required for custom external calls
+  maxUncreditedValue: 0,
+  maxCreditedValue: ethers.utils.parseEther("100")
+};
+
+await creditsManager.useCredits(useCreditsArgs);
+```
