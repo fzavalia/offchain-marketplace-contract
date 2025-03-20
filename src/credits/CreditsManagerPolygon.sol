@@ -364,9 +364,6 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         // Validate and get how much MANA will be credited by the credits.
         uint256 creditedValue = _validateAndApplyCredits(_args, sender, manaTransferred);
 
-        // Perform different checks on the credited value obtained.
-        _validateCreditedValue(_args, creditedValue);
-
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
 
@@ -706,16 +703,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             }
         }
 
-        emit CreditsUsed(_sender, _manaTransferred, creditedValue);
-    }
-
-    /// @dev Validates the amount of MANA credited.
-    /// @param _args The arguments for the useCredits function.
-    /// @param _creditedValue The amount of MANA credited.
-    function _validateCreditedValue(UseCreditsArgs calldata _args, uint256 _creditedValue) internal {
         // Checks that the amount of MANA credited is not higher than the maximum amount allowed by caller.
-        if (_creditedValue > _args.maxCreditedValue) {
-            revert MaxCreditedValueExceeded(_creditedValue, _args.maxCreditedValue);
+        if (creditedValue > _args.maxCreditedValue) {
+            revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
         }
 
         // Check hourly rate limit
@@ -736,12 +726,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         }
 
         // Checks that the amount of MANA credited is not higher than the maximum amount allowed by hour.
-        if (_creditedValue > creditableManaThisHour) {
-            revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, _creditedValue);
+        if (creditedValue > creditableManaThisHour) {
+            revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, creditedValue);
         }
 
         // Increase the amount of mana credited this hour
-        manaCreditedThisHour += _creditedValue;
+        manaCreditedThisHour += creditedValue;
+
+        emit CreditsUsed(_sender, _manaTransferred, creditedValue);
     }
 
     /// @dev Handles the uncredited value.
