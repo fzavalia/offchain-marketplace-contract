@@ -187,6 +187,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     error UsedCustomExternalCallSignature(bytes32 _hashedCustomExternalCallSignature);
     error InvalidCustomExternalCallSignature(address _recoveredSigner);
     error ExternalCallFailed(ExternalCall _externalCall);
+    error SenderBalanceChanged();
     error NoMANATransfer();
     error NoCredits();
     error InvalidCreditsSignaturesLength();
@@ -593,11 +594,21 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         // Store the mana balance before the external call.
         uint256 balanceBefore = mana.balanceOf(address(this));
 
+        // Store the sender's balance before the external call.
+        uint256 senderBalanceBefore = mana.balanceOf(_sender);
+
         // Execute the external call.
         (bool success,) = _args.externalCall.target.call(abi.encodePacked(_args.externalCall.selector, _args.externalCall.data));
 
         if (!success) {
             revert ExternalCallFailed(_args.externalCall);
+        }
+
+        // Check that the sender's balance has not changed.
+        // This is to prevent the sender from using a credit to obtain MANA directly by buying their own assets.
+        // Keep in mind that this prevents item creators from buying their creations in secondary sales because they will receive royalties, updating their mana balance.
+        if (senderBalanceBefore != mana.balanceOf(_sender)) {
+            revert SenderBalanceChanged();
         }
 
         // Store how much MANA was transferred out of the contract after the external call.
