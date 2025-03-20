@@ -683,11 +683,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             }
 
             // Calculate how much MANA is left to be credited from the total MANA transferred in the external call.
-            uint256 uncreditedValue = _manaTransferred - creditedValue;
+            uint256 remainingValue = _manaTransferred - creditedValue;
 
             // Calculate how much of the credit to spend.
             // If the required amount is lower than the available amount, spend the required amount and leave some credit amount for future calls.
-            uint256 creditValueToSpend = uncreditedValue < creditRemainingValue ? uncreditedValue : creditRemainingValue;
+            uint256 creditValueToSpend = remainingValue < creditRemainingValue ? remainingValue : creditRemainingValue;
 
             // Increment the amount consumed from the credit.
             spentValue[signatureHash] += creditValueToSpend;
