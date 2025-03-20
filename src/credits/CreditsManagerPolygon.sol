@@ -27,7 +27,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     /// @notice The role that can deny users from using credits.
-    bytes32 public constant DENIER_ROLE = keccak256("DENIER_ROLE");
+    bytes32 public constant USER_DENIER_ROLE = keccak256("USER_DENIER_ROLE");
 
     /// @notice The role that can revoke credits.
     bytes32 public constant REVOKER_ROLE = keccak256("REVOKER_ROLE");
@@ -104,7 +104,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param owner The address that acts as default admin.
     /// @param creditsSigner The address that can sign credits.
     /// @param pauser The address that can pause the contract.
-    /// @param denier The address that can deny users from using credits.
+    /// @param userDenier The address that can deny users from using credits.
     /// @param revoker The address that can revoke credits.
     /// @param customExternalCallSigner The address that can sign custom external calls.
     /// @param customExternalCallRevoker The address that can revoke custom external calls.
@@ -112,7 +112,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         address owner;
         address creditsSigner;
         address pauser;
-        address denier;
+        address userDenier;
         address revoker;
         address customExternalCallSigner;
         address customExternalCallRevoker;
@@ -230,8 +230,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _grantRole(PAUSER_ROLE, _roles.pauser);
         _grantRole(PAUSER_ROLE, _roles.owner);
 
-        _grantRole(DENIER_ROLE, _roles.denier);
-        _grantRole(DENIER_ROLE, _roles.owner);
+        _grantRole(USER_DENIER_ROLE, _roles.userDenier);
+        _grantRole(USER_DENIER_ROLE, _roles.owner);
 
         _grantRole(REVOKER_ROLE, _roles.revoker);
         _grantRole(REVOKER_ROLE, _roles.owner);
@@ -267,7 +267,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice Denies a user from using credits.
     /// @param _user The user to deny.
-    function denyUser(address _user) external onlyRole(DENIER_ROLE) {
+    function denyUser(address _user) external onlyRole(USER_DENIER_ROLE) {
         isDenied[_user] = true;
 
         emit UserDenied(_msgSender(), _user);

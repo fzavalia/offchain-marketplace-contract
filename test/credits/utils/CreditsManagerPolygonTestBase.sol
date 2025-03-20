@@ -14,7 +14,7 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
     address internal creditsSigner;
     uint256 internal creditsSignerPk;
     address internal pauser;
-    address internal denier;
+    address internal userDenier;
     address internal revoker;
     address internal customExternalCallSigner;
     uint256 internal customExternalCallSignerPk;
@@ -66,7 +66,7 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
         owner = makeAddr("owner");
         (creditsSigner, creditsSignerPk) = makeAddrAndKey("creditsSigner");
         pauser = makeAddr("pauser");
-        denier = makeAddr("denier");
+        userDenier = makeAddr("userDenier");
         revoker = makeAddr("revoker");
         (customExternalCallSigner, customExternalCallSignerPk) = makeAddrAndKey("customExternalCallSigner");
         customExternalCallRevoker = makeAddr("customExternalCallRevoker");
@@ -75,7 +75,7 @@ contract CreditsManagerPolygonTestBase is Test, IERC721Receiver {
             owner: owner,
             creditsSigner: creditsSigner,
             pauser: pauser,
-            denier: denier,
+            userDenier: userDenier,
             revoker: revoker,
             customExternalCallSigner: customExternalCallSigner,
             customExternalCallRevoker: customExternalCallRevoker

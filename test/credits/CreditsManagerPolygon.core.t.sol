@@ -12,8 +12,8 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(creditsManager.hasRole(creditsManager.CREDITS_SIGNER_ROLE(), creditsSigner), true);
         assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), pauser), true);
         assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), owner), true);
-        assertEq(creditsManager.hasRole(creditsManager.DENIER_ROLE(), denier), true);
-        assertEq(creditsManager.hasRole(creditsManager.DENIER_ROLE(), owner), true);
+        assertEq(creditsManager.hasRole(creditsManager.USER_DENIER_ROLE(), userDenier), true);
+        assertEq(creditsManager.hasRole(creditsManager.USER_DENIER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.REVOKER_ROLE(), revoker), true);
         assertEq(creditsManager.hasRole(creditsManager.REVOKER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_SIGNER_ROLE(), customExternalCallSigner), true);
@@ -69,14 +69,14 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     }
 
     function test_denyUser_RevertsWhenNotDenier() public {
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.DENIER_ROLE()));
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.USER_DENIER_ROLE()));
         creditsManager.denyUser(address(this));
     }
 
     function test_denyUser_WhenDenier() public {
         vm.expectEmit(address(creditsManager));
-        emit UserDenied(denier, address(this));
-        vm.prank(denier);
+        emit UserDenied(userDenier, address(this));
+        vm.prank(userDenier);
         creditsManager.denyUser(address(this));
         assertTrue(creditsManager.isDenied(address(this)));
     }
@@ -97,8 +97,8 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     }
 
     function test_allowUser_RevertsWhenDenier() public {
-        vm.startPrank(denier);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, denier, creditsManager.DEFAULT_ADMIN_ROLE()));
+        vm.startPrank(userDenier);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, userDenier, creditsManager.DEFAULT_ADMIN_ROLE()));
         creditsManager.allowUser(address(this));
         vm.stopPrank();
     }

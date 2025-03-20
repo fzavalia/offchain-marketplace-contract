@@ -766,7 +766,7 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
     }
 
     function test_useCredits_RevertsWhenUserIsDenied() public {
-        vm.prank(denier);
+        vm.prank(userDenier);
         creditsManager.denyUser(address(this));
 
         CreditsManagerPolygon.Credit[] memory credits = new CreditsManagerPolygon.Credit[](1);
