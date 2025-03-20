@@ -21,7 +21,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     using SafeERC20 for IERC20;
 
     /// @notice The role that can sign credits.
-    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
+    bytes32 public constant CREDITS_SIGNER_ROLE = keccak256("CREDITS_SIGNER_ROLE");
 
     /// @notice The role that can pause the contract.
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
@@ -102,7 +102,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice The roles to initialize the contract with.
     /// @param owner The address that acts as default admin.
-    /// @param signer The address that can sign credits.
+    /// @param creditsSigner The address that can sign credits.
     /// @param pauser The address that can pause the contract.
     /// @param denier The address that can deny users from using credits.
     /// @param revoker The address that can revoke credits.
@@ -110,7 +110,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param customExternalCallRevoker The address that can revoke custom external calls.
     struct Roles {
         address owner;
-        address signer;
+        address creditsSigner;
         address pauser;
         address denier;
         address revoker;
@@ -121,11 +121,11 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice The arguments for the useCredits function.
     /// @param credits The credits to use.
     /// @param creditsSignatures The signatures of the credits.
-    /// Has to be signed by a wallet that has the signer role.
+    /// Has to be signed by a wallet that has the credits signer role.
     /// @param externalCall The external call to make.
     /// @param customExternalCallSignature The signature of the external call.
     /// Only used for custom external calls.
-    /// Has to be signed by a wallet that has the customExternalCallSigner role.
+    /// Has to be signed by a wallet that has the custom external call signer role.
     /// @param maxUncreditedValue The maximum amount of MANA the user is willing to pay from their wallet when credits are insufficient to cover the total transaction cost.
     /// @param maxCreditedValue The maximum amount of MANA that can be credited from the provided credits.
     struct UseCreditsArgs {
@@ -225,7 +225,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     ) EIP712("Decentraland Credits", "1.0.0") {
         _grantRole(DEFAULT_ADMIN_ROLE, _roles.owner);
 
-        _grantRole(SIGNER_ROLE, _roles.signer);
+        _grantRole(CREDITS_SIGNER_ROLE, _roles.creditsSigner);
 
         _grantRole(PAUSER_ROLE, _roles.pauser);
         _grantRole(PAUSER_ROLE, _roles.owner);
@@ -672,8 +672,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             // Recover the signer of the signature.
             address recoveredSigner = keccak256(abi.encode(_sender, block.chainid, address(this), credit)).recover(_args.creditsSignatures[i]);
 
-            // Check that the signature has been signed by the signer role.
-            if (!hasRole(SIGNER_ROLE, recoveredSigner)) {
+            // Check that the signature has been signed by the credits signer role.
+            if (!hasRole(CREDITS_SIGNER_ROLE, recoveredSigner)) {
                 revert InvalidSignature(signatureHash, recoveredSigner);
             }
 

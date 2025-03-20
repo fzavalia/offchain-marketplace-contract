@@ -17,7 +17,7 @@ contract DeployCreditsManagerPolygonScript is Script {
         // Create roles struct
         CreditsManagerPolygon.Roles memory roles = CreditsManagerPolygon.Roles({
             owner: vm.envAddress("OWNER"),
-            signer: vm.envAddress("SIGNER"),
+            creditsSigner: vm.envAddress("CREDITS_SIGNER"),
             pauser: vm.envAddress("PAUSER"),
             denier: vm.envAddress("DENIER"),
             revoker: vm.envAddress("REVOKER"),

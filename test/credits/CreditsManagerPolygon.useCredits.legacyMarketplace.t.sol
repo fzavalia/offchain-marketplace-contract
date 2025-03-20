@@ -20,7 +20,7 @@ contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerP
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -61,7 +61,7 @@ contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerP
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -105,7 +105,7 @@ contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerP
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 
@@ -146,7 +146,7 @@ contract CreditsManagerPolygonUseCreditsLegacyMarketplaceTest is CreditsManagerP
 
         bytes[] memory creditsSignatures = new bytes[](1);
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(creditsSignerPk, keccak256(abi.encode(address(this), block.chainid, address(creditsManager), credits[0])));
 
         creditsSignatures[0] = abi.encodePacked(r, s, v);
 

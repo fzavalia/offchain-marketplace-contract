@@ -9,7 +9,7 @@ import {CreditsManagerPolygonTestBase} from "test/credits/utils/CreditsManagerPo
 contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
     function test_constructor() public view {
         assertEq(creditsManager.hasRole(creditsManager.DEFAULT_ADMIN_ROLE(), owner), true);
-        assertEq(creditsManager.hasRole(creditsManager.SIGNER_ROLE(), signer), true);
+        assertEq(creditsManager.hasRole(creditsManager.CREDITS_SIGNER_ROLE(), creditsSigner), true);
         assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), pauser), true);
         assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.DENIER_ROLE(), denier), true);
