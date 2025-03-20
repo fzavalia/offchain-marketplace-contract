@@ -1145,6 +1145,11 @@ contract CreditsManagerPolygonUseCreditsCustomExternalCallTest is CreditsManager
             maxCreditedValue: 100 ether
         });
 
+        // Warp to the next hour.
+        // This is required because the credits manager uses the current hour to determine how much MANA can be credited.
+        // Warping to the next hour resets the creditable amount.
+        vm.warp(block.timestamp + 1 hours);
+
         // Second call - should revert with CreditConsumed
         bytes32 signatureHash = keccak256(creditsSignatures[0]);
         vm.expectRevert(abi.encodeWithSelector(CreditsManagerPolygon.CreditConsumed.selector, signatureHash));

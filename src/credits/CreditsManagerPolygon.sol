@@ -350,19 +350,25 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @notice Use credits to pay for external calls that transfer MANA.
     /// @param _args The arguments for the useCredits function.
     function useCredits(UseCreditsArgs calldata _args) external nonReentrant whenNotPaused {
+        // Get the sender of the transaction.
+        // Defined here to prevent calling _msgSender() multiple times for this transaction.
         address sender = _msgSender();
 
         // Handle pre-execution checks for the different types of external calls.
         _handlePreExecution(_args, sender);
 
+        // Calculate the amount of MANA that can be credited in the current hour.
+        // Defined here given that it will be used in multiple places.
+        uint256 currentHourCreditableManaAmount = _computeCurrentHourCreditableManaAmount();
+
         // Execute the external call and get the amount of MANA that was transferred out of the contract.
-        uint256 manaTransferred = _executeExternalCall(_args, sender);
+        uint256 manaTransferred = _executeExternalCall(_args, sender, currentHourCreditableManaAmount);
 
         // Handle post-execution checks.
         _handlePostExecution(_args, sender);
 
-        // Validate and get how much MANA will be credited by the credits.
-        uint256 creditedValue = _validateAndApplyCredits(_args, sender, manaTransferred);
+        // Validate and apply credits to get how much MANA will be credited by the credits.
+        uint256 creditedValue = _validateAndApplyCredits(_args, sender, manaTransferred, currentHourCreditableManaAmount);
 
         // Calculate how much mana was not covered by credits.
         uint256 uncredited = manaTransferred - creditedValue;
@@ -559,16 +565,30 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @dev Executes the external call.
     /// @param _args The arguments for the useCredits function.
     /// @param _sender The caller of the useCredits function.
+    /// @param _currentHourCreditableManaAmount The amount of MANA that is creditable for the current hour.
     /// @return manaTransferred The amount of MANA transferred out of the contract after the external call.
-    function _executeExternalCall(UseCreditsArgs calldata _args, address _sender) internal returns (uint256 manaTransferred) {
+    function _executeExternalCall(UseCreditsArgs calldata _args, address _sender, uint256 _currentHourCreditableManaAmount)
+        internal
+        returns (uint256 manaTransferred)
+    {
         if (_args.maxUncreditedValue > 0) {
             // Transfer the mana the caller is willing to pay from their wallet to this contract.
             // The caller will be returned any exceeding amount that was not needed to cover the uncredited amount.
             mana.safeTransferFrom(_sender, address(this), _args.maxUncreditedValue);
         }
 
-        // Approves the combined amount of credited and uncredited mana the caller is willing to pay.
-        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + _args.maxCreditedValue);
+        // The max amount to be credited is defined by the caller.
+        // However, if the max amount to be credited is higher than the amount of MANA that is creditable for the current hour,
+        // use the amount of MANA that is creditable for the current hour instead to avoid over approving.
+        uint256 maxCreditedValue = _args.maxCreditedValue;
+
+        if (maxCreditedValue > _currentHourCreditableManaAmount) {
+            maxCreditedValue = _currentHourCreditableManaAmount;
+        }
+
+        // Approves the maximum amount of MANA that can possibly be transferred out of the contract.
+        // This is the sum of the max amount the user is willing to pay out of pocket and the max amount to be credited.
+        mana.forceApprove(_args.externalCall.target, _args.maxUncreditedValue + maxCreditedValue);
 
         // Store the mana balance before the external call.
         uint256 balanceBefore = mana.balanceOf(address(this));
@@ -625,11 +645,14 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param _args The arguments for the useCredits function.
     /// @param _sender The caller of the useCredits function.
     /// @param _manaTransferred The amount of MANA transferred out of the contract after the external call.
+    /// @param _currentHourCreditableManaAmount The amount of MANA that can be credited this hour.
     /// @return creditedValue The amount of MANA credited from the credits.
-    function _validateAndApplyCredits(UseCreditsArgs calldata _args, address _sender, uint256 _manaTransferred)
-        internal
-        returns (uint256 creditedValue)
-    {
+    function _validateAndApplyCredits(
+        UseCreditsArgs calldata _args,
+        address _sender,
+        uint256 _manaTransferred,
+        uint256 _currentHourCreditableManaAmount
+    ) internal returns (uint256 creditedValue) {
         // Check that the number of credits is not 0.
         if (_args.credits.length == 0) {
             revert NoCredits();
@@ -708,26 +731,9 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
             revert MaxCreditedValueExceeded(creditedValue, _args.maxCreditedValue);
         }
 
-        // Check hourly rate limit
-        uint256 currentHour = block.timestamp / 1 hours;
-        uint256 creditableManaThisHour;
-
-        // Calculates how much mana could be credited this hour.
-        if (currentHour != hourOfLastManaCredit) {
-            // If the current hour is different than the one of the last execution, reset the values.
-            manaCreditedThisHour = 0;
-            hourOfLastManaCredit = currentHour;
-
-            // This new hour allows the maximum amount to be credited.
-            creditableManaThisHour = maxManaCreditedPerHour;
-        } else {
-            // If it is the same hour, the max creditable amount has to consider the amount already credited.
-            creditableManaThisHour = maxManaCreditedPerHour - manaCreditedThisHour;
-        }
-
         // Checks that the amount of MANA credited is not higher than the maximum amount allowed by hour.
-        if (creditedValue > creditableManaThisHour) {
-            revert MaxManaCreditedPerHourExceeded(creditableManaThisHour, creditedValue);
+        if (creditedValue > _currentHourCreditableManaAmount) {
+            revert MaxManaCreditedPerHourExceeded(_currentHourCreditableManaAmount, creditedValue);
         }
 
         // Increase the amount of mana credited this hour
@@ -784,6 +790,25 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         if (!collectionFactory.isCollectionFromFactory(_contractAddress) && !collectionFactoryV3.isCollectionFromFactory(_contractAddress)) {
             revert NotDecentralandCollection(_contractAddress);
         }
+    }
+
+    /// @dev This is used to compute the amount of MANA that can be credited this hour.
+    /// @return The amount of MANA that can be credited this hour.
+    function _computeCurrentHourCreditableManaAmount() internal returns (uint256) {
+        // Calculate the current hour.
+        uint256 currentHour = block.timestamp / 1 hours;
+
+        if (currentHour != hourOfLastManaCredit) {
+            // If the current hour is different than the one of the last execution, reset the values.
+            manaCreditedThisHour = 0;
+            hourOfLastManaCredit = currentHour;
+
+            // This new hour allows the maximum amount to be credited.
+            return maxManaCreditedPerHour;
+        }
+
+        // If it is the same hour, the max creditable amount has to consider the amount already credited.
+        return maxManaCreditedPerHour - manaCreditedThisHour;
     }
 
     /// @dev This is to support meta-transactions.
