@@ -30,7 +30,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     bytes32 public constant USER_DENIER_ROLE = keccak256("USER_DENIER_ROLE");
 
     /// @notice The role that can revoke credits.
-    bytes32 public constant REVOKER_ROLE = keccak256("REVOKER_ROLE");
+    bytes32 public constant CREDITS_REVOKER_ROLE = keccak256("CREDITS_REVOKER_ROLE");
 
     /// @notice The role that can sign external calls.
     bytes32 public constant EXTERNAL_CALL_SIGNER_ROLE = keccak256("EXTERNAL_CALL_SIGNER_ROLE");
@@ -105,7 +105,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
     /// @param creditsSigner The address that can sign credits.
     /// @param pauser The address that can pause the contract.
     /// @param userDenier The address that can deny users from using credits.
-    /// @param revoker The address that can revoke credits.
+    /// @param creditsRevoker The address that can revoke credits.
     /// @param customExternalCallSigner The address that can sign custom external calls.
     /// @param customExternalCallRevoker The address that can revoke custom external calls.
     struct Roles {
@@ -113,7 +113,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         address creditsSigner;
         address pauser;
         address userDenier;
-        address revoker;
+        address creditsRevoker;
         address customExternalCallSigner;
         address customExternalCallRevoker;
     }
@@ -233,8 +233,8 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
         _grantRole(USER_DENIER_ROLE, _roles.userDenier);
         _grantRole(USER_DENIER_ROLE, _roles.owner);
 
-        _grantRole(REVOKER_ROLE, _roles.revoker);
-        _grantRole(REVOKER_ROLE, _roles.owner);
+        _grantRole(CREDITS_REVOKER_ROLE, _roles.creditsRevoker);
+        _grantRole(CREDITS_REVOKER_ROLE, _roles.owner);
 
         _grantRole(EXTERNAL_CALL_SIGNER_ROLE, _roles.customExternalCallSigner);
 
@@ -285,7 +285,7 @@ contract CreditsManagerPolygon is AccessControl, Pausable, ReentrancyGuard, Nati
 
     /// @notice Revokes a credit.
     /// @param _credit The hash of the credit signature.
-    function revokeCredit(bytes32 _credit) external onlyRole(REVOKER_ROLE) {
+    function revokeCredit(bytes32 _credit) external onlyRole(CREDITS_REVOKER_ROLE) {
         isRevoked[_credit] = true;
 
         emit CreditRevoked(_msgSender(), _credit);

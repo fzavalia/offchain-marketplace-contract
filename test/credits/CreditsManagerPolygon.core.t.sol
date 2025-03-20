@@ -14,8 +14,8 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
         assertEq(creditsManager.hasRole(creditsManager.PAUSER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.USER_DENIER_ROLE(), userDenier), true);
         assertEq(creditsManager.hasRole(creditsManager.USER_DENIER_ROLE(), owner), true);
-        assertEq(creditsManager.hasRole(creditsManager.REVOKER_ROLE(), revoker), true);
-        assertEq(creditsManager.hasRole(creditsManager.REVOKER_ROLE(), owner), true);
+        assertEq(creditsManager.hasRole(creditsManager.CREDITS_REVOKER_ROLE(), creditsRevoker), true);
+        assertEq(creditsManager.hasRole(creditsManager.CREDITS_REVOKER_ROLE(), owner), true);
         assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_SIGNER_ROLE(), customExternalCallSigner), true);
         assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_REVOKER_ROLE(), customExternalCallRevoker), true);
         assertEq(creditsManager.hasRole(creditsManager.EXTERNAL_CALL_REVOKER_ROLE(), owner), true);
@@ -113,15 +113,15 @@ contract CreditsManagerPolygonCoreTest is CreditsManagerPolygonTestBase {
 
     function test_revokeCredit_RevertsWhenNotRevoker() public {
         vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.REVOKER_ROLE())
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), creditsManager.CREDITS_REVOKER_ROLE())
         );
         creditsManager.revokeCredit(bytes32(0));
     }
 
     function test_revokeCredit_WhenRevoker() public {
         vm.expectEmit(address(creditsManager));
-        emit CreditRevoked(revoker, bytes32(0));
-        vm.prank(revoker);
+        emit CreditRevoked(creditsRevoker, bytes32(0));
+        vm.prank(creditsRevoker);
         creditsManager.revokeCredit(bytes32(0));
         assertTrue(creditsManager.isRevoked(bytes32(0)));
     }

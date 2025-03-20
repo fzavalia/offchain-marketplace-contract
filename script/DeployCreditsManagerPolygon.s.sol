@@ -20,7 +20,7 @@ contract DeployCreditsManagerPolygonScript is Script {
             creditsSigner: vm.envAddress("CREDITS_SIGNER"),
             pauser: vm.envAddress("PAUSER"),
             userDenier: vm.envAddress("USER_DENIER"),
-            revoker: vm.envAddress("REVOKER"),
+            creditsRevoker: vm.envAddress("CREDITS_REVOKER"),
             customExternalCallSigner: vm.envAddress("EXTERNAL_CALL_SIGNER"),
             customExternalCallRevoker: vm.envAddress("EXTERNAL_CALL_REVOKER")
         });
